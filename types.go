@@ -2,6 +2,7 @@ package goblin
 
 import (
 	"errors"
+	"io"
 )
 
 var (
@@ -10,7 +11,11 @@ var (
 
 type BlockID uint32
 
+func (i BlockID) IsReserved() bool { return i >= 0xFFFF_FF00 }
+
 type BlockType uint32
+type BlockVersion uint16
+type BlockCompression uint16
 
 func (bt BlockType) IsPublic() bool  { return bt&BlockType(0x8000_0000) == 0 }
 func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
@@ -18,10 +23,15 @@ func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
 // Built-in block types
 const (
 	BlockTypeFileInfo  = BlockType(1)
-	BlockTypeMetadata  = BlockType(2)
+	BlockTypeStrings   = BlockType(2)
 	BlockTypeRelations = BlockType(3)
-	BlockTypeStrings   = BlockType(4)
+	BlockTypeMetadata  = BlockType(4)
 	BlockTypeBlob      = BlockType(5)
+)
+
+const (
+	BlockIDRelations = BlockID(0xFFFF_FF00)
+	BlockIDStrings   = BlockID(0xFFFF_FFFF)
 )
 
 type StringRef uint32
@@ -31,11 +41,31 @@ type BlockContent interface {
 	GoblinType() BlockType
 }
 
+const (
+	NoCompression = BlockCompression(0)
+	GZip          = BlockCompression(1)
+	ZLib          = BlockCompression(2)
+)
+
 type BlockTypeHandler interface {
-	// TODO: GoblinDump(w io.Writer, opts *DumpOpts)
+	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
+
 	GoblinLint(c any) error
-	GoblinEncode(dst *EncodeContext, c any) (int, error)
-	GoblinDecode(src *DecodeContext, size int) (any, error)
+
+	// Returns the compression type employed by the given version number.
+	// This method is used to wrap to readers/writers passed into GoblinDecode()
+	// and GoblinEncode().
+	//
+	// When writing, version will be zero, so the method should return
+	// whatever compression type is required for newly written blocks
+	// i.e. that matching the version number ultimately returned by
+	// GoblinEncode().
+	GoblinCompression(version BlockVersion) BlockCompression
+
+	// Encode the block to the target writer, returning the version number.
+	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
+
+	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int) (any, error)
 }
 
 const (

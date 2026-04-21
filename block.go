@@ -1,13 +1,10 @@
 package goblin
 
 type Block struct {
-	ID      BlockID
-	Type    BlockType
-	Version int
-	Name    string
-	Data    any
-	// TODO: encoding
-	// TODO: compression
+	ID   BlockID
+	Type BlockType
+	Name string
+	Data any
 
 	C *Container
 }

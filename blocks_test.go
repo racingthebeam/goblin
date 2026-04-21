@@ -14,44 +14,44 @@ func TestStringsCodec(t *testing.T) {
 	var ex bool
 
 	i, ex = ss.Add("foo")
-	assert.Equal(t, StringRef(0), i)
-	assert.False(t, ex)
-
-	i, ex = ss.Add("bar")
 	assert.Equal(t, StringRef(1), i)
 	assert.False(t, ex)
 
-	i, ex = ss.Add("quux")
+	i, ex = ss.Add("bar")
 	assert.Equal(t, StringRef(2), i)
 	assert.False(t, ex)
 
+	i, ex = ss.Add("quux")
+	assert.Equal(t, StringRef(3), i)
+	assert.False(t, ex)
+
 	i, ex = ss.Add("bar")
-	assert.Equal(t, StringRef(1), i)
+	assert.Equal(t, StringRef(2), i)
 	assert.True(t, ex)
 
 	var buf bytes.Buffer
 
 	codec := &stringsHandler{}
 
-	ec := NewEncodeContext(&buf)
+	ec := NewEncodeContext()
 
-	n, err := codec.GoblinEncode(ec, ss)
+	n, err := codec.GoblinEncode(ec, &buf, ss)
 	assert.NoError(t, err)
-	assert.Equal(t, 13, n)
+	assert.Equal(t, BlockVersion(1), n)
 
 	dc := NewDecodeContext(&buf, nil)
-	reloaded, err := codec.GoblinDecode(dc, n)
+	reloaded, err := codec.GoblinDecode(dc, &buf, 1, 13)
 	assert.NoError(t, err)
 
-	str, ok := reloaded.(*Strings).Lookup(0)
+	str, ok := reloaded.(*Strings).Lookup(1)
 	assert.True(t, ok)
 	assert.Equal(t, "foo", str)
 
-	str, ok = reloaded.(*Strings).Lookup(1)
+	str, ok = reloaded.(*Strings).Lookup(2)
 	assert.True(t, ok)
 	assert.Equal(t, "bar", str)
 
-	str, ok = reloaded.(*Strings).Lookup(2)
+	str, ok = reloaded.(*Strings).Lookup(3)
 	assert.True(t, ok)
 	assert.Equal(t, "quux", str)
 }
@@ -66,16 +66,16 @@ func TestRelationsCodec(t *testing.T) {
 	buf := bytes.Buffer{}
 	hnd := &relationsHandler{}
 
-	ec := NewEncodeContext(&buf)
-	n, err := hnd.GoblinEncode(ec, rels)
+	ec := NewEncodeContext()
+	n, err := hnd.GoblinEncode(ec, &buf, rels)
 	assert.NoError(t, err)
-	assert.Equal(t, 48, n)
+	assert.Equal(t, BlockVersion(1), n)
 
 	assert.True(t, ec.Strings.Has("child"))
 	assert.True(t, ec.Strings.Has("palette"))
 	assert.True(t, ec.Strings.Has("metadata"))
 
-	reloaded, err := hnd.GoblinDecode(NewDecodeContext(&buf, ec.Strings), 48)
+	reloaded, err := hnd.GoblinDecode(NewDecodeContext(&buf, ec.Strings), &buf, 1, 48)
 	assert.NoError(t, err)
 	assert.Equal(t, rels, reloaded.(Relations))
 }

@@ -3,6 +3,7 @@ package goblin
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
 type RelationKind uint32
@@ -24,8 +25,6 @@ type Relation struct {
 
 type Relations []Relation
 
-func (r Relations) GoblinType() BlockType { return BlockTypeRelations }
-
 func (r Relations) ChildrenOf(dst []Relation, bid BlockID) []Relation {
 	for i := range r {
 		if r[i].FromBlockID == bid && r[i].Kind == Contains {
@@ -39,6 +38,10 @@ func (r Relations) ChildrenOf(dst []Relation, bid BlockID) []Relation {
 // Codec
 
 type relationsHandler struct{}
+
+func (h *relationsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
+	return nil
+}
 
 func (h *relationsHandler) GoblinLint(c any) error {
 	rs, ok := c.(Relations)
@@ -57,41 +60,43 @@ func (h *relationsHandler) GoblinLint(c any) error {
 	return nil
 }
 
-func (h *relationsHandler) GoblinEncode(ec *EncodeContext, c any) (int, error) {
+func (h *relationsHandler) GoblinCompression(version BlockVersion) BlockCompression {
+	return NoCompression
+}
+
+func (h *relationsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	rs, ok := c.(Relations)
 	if !ok {
 		return 0, ErrInvalidDataType
 	}
 
-	written := 0
 	for i := range rs {
 		str, _ := ec.Strings.Add(rs[i].Name)
-		err1 := binary.Write(ec, binary.BigEndian, rs[i].FromBlockID)
-		err2 := binary.Write(ec, binary.BigEndian, rs[i].ToBlockID)
-		err3 := binary.Write(ec, binary.BigEndian, rs[i].Kind)
-		err4 := binary.Write(ec, binary.BigEndian, str)
+		err1 := binary.Write(w, binary.BigEndian, rs[i].FromBlockID)
+		err2 := binary.Write(w, binary.BigEndian, rs[i].ToBlockID)
+		err3 := binary.Write(w, binary.BigEndian, rs[i].Kind)
+		err4 := binary.Write(w, binary.BigEndian, str)
 		if err := anyErr(err1, err2, err3, err4); err != nil {
 			return 0, err
 		}
-		written += relationRecordLength
 	}
 
-	return written, nil
+	return 1, nil
 }
 
-func (h *relationsHandler) GoblinDecode(dc *DecodeContext, n int) (any, error) {
-	if n%relationRecordLength != 0 {
+func (h *relationsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+	if size%relationRecordLength != 0 {
 		return nil, fmt.Errorf("relation block size must be multiple of %d", relationRecordLength)
 	}
 
-	out := make(Relations, n/relationRecordLength)
+	out := make(Relations, size/relationRecordLength)
 
 	for i := range out {
-		err1 := binary.Read(dc, binary.BigEndian, &out[i].FromBlockID)
-		err2 := binary.Read(dc, binary.BigEndian, &out[i].ToBlockID)
-		err3 := binary.Read(dc, binary.BigEndian, &out[i].Kind)
+		err1 := binary.Read(r, binary.BigEndian, &out[i].FromBlockID)
+		err2 := binary.Read(r, binary.BigEndian, &out[i].ToBlockID)
+		err3 := binary.Read(r, binary.BigEndian, &out[i].Kind)
 		var str StringRef
-		err4 := binary.Read(dc, binary.BigEndian, &str)
+		err4 := binary.Read(r, binary.BigEndian, &str)
 		if err := anyErr(err1, err2, err3, err4); err != nil {
 			return nil, err
 		}

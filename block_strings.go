@@ -21,20 +21,26 @@ func NewStrings() *Strings {
 	}
 }
 
-func (s *Strings) GoblinType() BlockType { return BlockTypeStrings }
-
 func (s *Strings) Has(str string) bool {
+	if len(str) == 0 {
+		return true
+	}
+
 	_, ok := s.lookup[str]
 	return ok
 }
 
 func (s *Strings) Add(str string) (StringRef, bool) {
+	if len(str) == 0 {
+		return 0, true
+	}
+
 	ix, exists := s.lookup[str]
 	if exists {
 		return ix, true
 	}
 
-	ix = StringRef(len(s.strings))
+	ix = StringRef(len(s.strings) + 1)
 	s.lookup[str] = ix
 	s.strings = append(s.strings, str)
 
@@ -42,13 +48,22 @@ func (s *Strings) Add(str string) (StringRef, bool) {
 }
 
 func (s *Strings) Lookup(i StringRef) (string, bool) {
-	if i >= StringRef(len(s.strings)) {
+	if i == 0 {
+		return "", true
+	}
+
+	if i > StringRef(len(s.strings)) {
 		return "", false
 	}
-	return s.strings[i], true
+
+	return s.strings[i-1], true
 }
 
 type stringsHandler struct{}
+
+func (h *stringsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
+	return nil
+}
 
 func (h *stringsHandler) GoblinLint(c any) error {
 	ss, ok := c.(*Strings)
@@ -63,30 +78,31 @@ func (h *stringsHandler) GoblinLint(c any) error {
 	return nil
 }
 
+func (h *stringsHandler) GoblinCompression(version BlockVersion) BlockCompression {
+	return NoCompression
+}
+
 var nul = []byte{0}
 
-func (h *stringsHandler) GoblinEncode(w *EncodeContext, c any) (int, error) {
+func (h *stringsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	ss, ok := c.(*Strings)
 	if !ok {
 		return 0, ErrInvalidDataType
 	}
 
-	written := 0
 	for ix, str := range ss.strings {
-		if n, err := w.Write([]byte(str)); err != nil {
+		if _, err := w.Write([]byte(str)); err != nil {
 			return 0, fmt.Errorf("failed to write string at index %d (%s)", ix, err)
 		} else if _, err := w.Write(nul); err != nil {
 			return 0, fmt.Errorf("failed to write null terminator at index %d (%s)", ix, err)
-		} else {
-			written += n + 1
 		}
 	}
 
-	return written, nil
+	return 1, nil
 }
 
-func (h *stringsHandler) GoblinDecode(dc *DecodeContext, bl int) (any, error) {
-	r := &io.LimitedReader{R: dc, N: int64(bl)}
+func (h *stringsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+	r = &io.LimitedReader{R: r, N: int64(size)}
 
 	s := bufio.NewScanner(r)
 	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
