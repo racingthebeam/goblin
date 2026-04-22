@@ -1,7 +1,9 @@
 package goblin
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -211,6 +213,135 @@ func NewEncodeContext() *EncodeContext {
 //
 // Decoder
 
+type Decoder struct {
+	r io.ReadSeeker
+	c *DecodeContext
+}
+
+func NewDecoder(r io.ReadSeeker) *Decoder {
+	return &Decoder{
+		r: r,
+	}
+}
+
+func (d *Decoder) Decode() (*Container, error) {
+	out := Container{
+		blocks:    map[BlockID]*Block{},
+		relations: nil,
+	}
+
+	buf := make([]byte, indexEntrySize)
+
+	n, err := d.r.Read(buf[0:12])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read container header (%s)", err)
+	} else if n != 12 {
+		return nil, fmt.Errorf("expected 12 bytes, got %d", n)
+	} else if !bytes.Equal(header, buf[0:8]) {
+		return nil, errors.New("invalid header")
+	}
+
+	index := make([]indexEntry, binary.BigEndian.Uint32(buf[8:]))
+
+	for i := range len(index) {
+		if err := d.readIndexEntry(&index[i], buf); err != nil {
+			return nil, fmt.Errorf("failed to read index entry %d (%s)", i, err)
+		}
+	}
+
+	found := false
+	for i := range index {
+		if index[i].Type != BlockTypeStrings {
+			continue
+		}
+		block, err := d.readBlockFromEntry(&index[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to read strings block (%s)", err)
+		}
+		asStrings, ok := block.Data.(*Strings)
+		if !ok {
+			return nil, errors.New("strings block returned incorrect data type")
+		}
+		d.c = NewDecodeContext(asStrings)
+		found = true
+	}
+
+	if !found {
+		return nil, errors.New("strings block not found")
+	}
+
+	for i := range index {
+		if index[i].Type == BlockTypeStrings {
+			continue
+		} else if block, err := d.readBlockFromEntry(&index[i]); err != nil {
+			return nil, err
+		} else if block.Type == BlockTypeRelations {
+			if rs, ok := block.Data.(Relations); !ok {
+				return nil, errors.New("relations block returned incorrect data type")
+			} else {
+				out.relations = rs
+			}
+		} else {
+			out.blocks[block.ID] = block
+		}
+	}
+
+	return &out, nil
+}
+
+func (d *Decoder) readIndexEntry(dst *indexEntry, buf []byte) error {
+	if _, err := io.ReadFull(d.r, buf); err != nil {
+		return fmt.Errorf("failed to read index entry (%s)", err)
+	}
+	dst.ID = BlockID(binary.BigEndian.Uint32(buf[0:4]))
+	dst.Type = BlockType(binary.BigEndian.Uint32(buf[4:8]))
+	dst.Name = StringRef(binary.BigEndian.Uint32(buf[8:12]))
+	dst.Version = BlockVersion(binary.BigEndian.Uint16(buf[12:14]))
+	dst.Compression = BlockCompression(binary.BigEndian.Uint16(buf[14:16]))
+	dst.Offset = int64(binary.BigEndian.Uint64(buf[16:24]))
+	dst.Size = int64(binary.BigEndian.Uint64(buf[24:32]))
+	return nil
+}
+
+func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
+	hnd, found := LookupBlockType(ent.Type)
+	if !found {
+		return nil, fmt.Errorf("block ID %d has unknown type %d", ent.ID, ent.Type)
+	}
+
+	_, err := d.r.Seek(ent.Offset, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek to start of block ID %d (%s)", ent.ID, err)
+	}
+
+	r, err := wrapReader(&io.LimitedReader{R: d.r, N: ent.Size}, ent.Compression)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wrap reader for block ID %d (%s)", ent.ID, err)
+	}
+
+	data, err := hnd.GoblinDecode(d.c, r, ent.Version, int(ent.Size))
+	if err != nil {
+		return nil, fmt.Errorf("block ID %d decode failed (%s)", ent.ID, err)
+	}
+
+	// If the strings table is not populated it means we're reading the strings
+	// block itself. Just skip the lookup since it never has a name.
+	name := ""
+	if d.c.Strings != nil {
+		name, found = d.c.Strings.Lookup(ent.Name)
+		if !found {
+			return nil, fmt.Errorf("block ID %d name not found in strings table", ent.ID)
+		}
+	}
+
+	return &Block{
+		ID:   ent.ID,
+		Type: ent.Type,
+		Name: name,
+		Data: data,
+	}, nil
+}
+
 //
 // DecodeContext
 
@@ -218,7 +349,7 @@ type DecodeContext struct {
 	Strings *Strings
 }
 
-func NewDecodeContext(r io.Reader, strings *Strings) *DecodeContext {
+func NewDecodeContext(strings *Strings) *DecodeContext {
 	return &DecodeContext{
 		Strings: strings,
 	}
