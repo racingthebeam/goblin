@@ -1,4 +1,4 @@
-module github.com/beam256/goblin
+module github.com/racingthebeam/goblin
 
 go 1.25.0
 
