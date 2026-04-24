@@ -6,25 +6,50 @@ import (
 )
 
 var (
-	blockTypes     = map[BlockType]BlockTypeHandler{}
-	blockTypesLock sync.RWMutex
+	globalRegistry = NewRegistry()
 )
 
 func LookupBlockType(bt BlockType) (BlockTypeHandler, bool) {
-	blockTypesLock.RLock()
-	defer blockTypesLock.RUnlock()
-
-	hnd, ok := blockTypes[bt]
-	return hnd, ok
+	return globalRegistry.LookupBlockType(bt)
 }
 
 func RegisterBlockType(bt BlockType, hnd BlockTypeHandler) {
-	blockTypesLock.Lock()
-	defer blockTypesLock.Unlock()
+	globalRegistry.RegisterBlockType(bt, hnd)
+}
 
-	if _, ok := blockTypes[bt]; ok {
+type Registry struct {
+	blockTypes     map[BlockType]BlockTypeHandler
+	blockTypesLock sync.RWMutex
+}
+
+func NewRegistry() *Registry {
+	r := &Registry{
+		blockTypes: map[BlockType]BlockTypeHandler{},
+	}
+
+	r.RegisterBlockType(BlockTypeRelations, &relationsHandler{})
+	r.RegisterBlockType(BlockTypeStrings, &stringsHandler{})
+	r.RegisterBlockType(BlockTypeFileInfo, &fileInfoHandler{})
+	r.RegisterBlockType(BlockTypeBlob, &blobHandler{})
+
+	return r
+}
+
+func (r *Registry) LookupBlockType(bt BlockType) (BlockTypeHandler, bool) {
+	r.blockTypesLock.RLock()
+	defer r.blockTypesLock.RUnlock()
+
+	hnd, ok := r.blockTypes[bt]
+	return hnd, ok
+}
+
+func (r *Registry) RegisterBlockType(bt BlockType, hnd BlockTypeHandler) {
+	r.blockTypesLock.Lock()
+	defer r.blockTypesLock.Unlock()
+
+	if _, ok := r.blockTypes[bt]; ok {
 		panic(fmt.Errorf("duplicate block type %d", bt))
 	}
 
-	blockTypes[bt] = hnd
+	r.blockTypes[bt] = hnd
 }

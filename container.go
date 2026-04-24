@@ -1,35 +1,63 @@
 package goblin
 
-import "io"
+import (
+	"errors"
+	"fmt"
+	"io"
+)
 
 type Container struct {
-	blocks map[BlockID]*Block
-
-	strings   *Strings
+	blocks    map[BlockID]*Block
 	relations Relations
 }
 
-func (c *Container) Dump(w io.Writer) {
-
+func NewContainer() *Container {
+	return &Container{
+		blocks: map[BlockID]*Block{},
+	}
 }
 
-func (c *Container) Strings() *Strings {
-	if c.strings == nil {
-		ss := c.FirstBlockOfType(BlockTypeStrings)
-		if ss != nil {
-			c.strings = ss.Data.(*Strings)
-		}
+func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (BlockID, error) {
+	if typ == 0 {
+		return 0, errors.New("block type must not be zero")
 	}
-	return c.strings
+
+	if id == 0 {
+		// TODO: generate ID
+	}
+
+	if _, exists := c.blocks[id]; exists {
+		return 0, fmt.Errorf("block ID %d already exists", id)
+	}
+
+	c.blocks[id] = &Block{
+		ID:   id,
+		Type: typ,
+		Name: name,
+		Data: data,
+
+		C: c,
+	}
+
+	return id, nil
+}
+
+// BlockData returns the data for the specified block ID, or false if there
+// is no such block. If et is non-zero, an additional check will be performed
+// to ensure the block's type matches the expected.
+func (c *Container) BlockData(id BlockID, et BlockType) (any, bool) {
+	b, ok := c.blocks[id]
+	if !ok || (et != 0 && et != b.Type) {
+		return nil, false
+	}
+	return b.Data, true
+}
+
+func (c *Container) Dump(w io.Writer, opts *DumpOpts) {
+
 }
 
 func (c *Container) Relations() Relations {
-	if c.relations == nil {
-		rs := c.FirstBlockOfType(BlockTypeRelations)
-		if rs != nil {
-			c.relations = rs.Data.(Relations)
-		}
-	}
 	return c.relations
 }
 

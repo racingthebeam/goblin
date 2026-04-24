@@ -39,6 +39,18 @@ const (
 	indexEntrySize = 32
 )
 
+type Option func(any)
+
+func WithRegistry(r *Registry) Option {
+	return func(thing any) {
+		if enc, ok := thing.(*Encoder); ok {
+			enc.reg = r
+		} else if dec, ok := thing.(*Decoder); ok {
+			dec.reg = r
+		}
+	}
+}
+
 //
 // Encoder
 
@@ -47,10 +59,15 @@ type Encoder struct {
 
 	index []indexEntry
 	c     *EncodeContext
+	reg   *Registry
 }
 
-func NewEncoder(w io.WriteSeeker) *Encoder {
-	return &Encoder{w: w}
+func NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
+	e := &Encoder{w: w}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
 func (e *Encoder) Encode(c *Container) error {
@@ -115,7 +132,7 @@ func (e *Encoder) Encode(c *Container) error {
 }
 
 func (e *Encoder) writeBlock(b *Block) (indexEntry, error) {
-	hnd, found := LookupBlockType(b.Type)
+	hnd, found := e.reg.LookupBlockType(b.Type)
 	if !found {
 		return indexEntry{}, fmt.Errorf("no block type handler found for block type %d", b.Type)
 	}
@@ -214,21 +231,21 @@ func NewEncodeContext() *EncodeContext {
 // Decoder
 
 type Decoder struct {
-	r io.ReadSeeker
-	c *DecodeContext
+	r   io.ReadSeeker
+	c   *DecodeContext
+	reg *Registry
 }
 
-func NewDecoder(r io.ReadSeeker) *Decoder {
-	return &Decoder{
-		r: r,
+func NewDecoder(r io.ReadSeeker, opts ...Option) *Decoder {
+	d := &Decoder{r: r}
+	for _, o := range opts {
+		o(d)
 	}
+	return d
 }
 
 func (d *Decoder) Decode() (*Container, error) {
-	out := Container{
-		blocks:    map[BlockID]*Block{},
-		relations: nil,
-	}
+	out := NewContainer()
 
 	buf := make([]byte, indexEntrySize)
 
@@ -286,7 +303,7 @@ func (d *Decoder) Decode() (*Container, error) {
 		}
 	}
 
-	return &out, nil
+	return out, nil
 }
 
 func (d *Decoder) readIndexEntry(dst *indexEntry, buf []byte) error {
@@ -304,7 +321,7 @@ func (d *Decoder) readIndexEntry(dst *indexEntry, buf []byte) error {
 }
 
 func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
-	hnd, found := LookupBlockType(ent.Type)
+	hnd, found := d.reg.LookupBlockType(ent.Type)
 	if !found {
 		return nil, fmt.Errorf("block ID %d has unknown type %d", ent.ID, ent.Type)
 	}
@@ -327,7 +344,7 @@ func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
 	// If the strings table is not populated it means we're reading the strings
 	// block itself. Just skip the lookup since it never has a name.
 	name := ""
-	if d.c.Strings != nil {
+	if d.c != nil {
 		name, found = d.c.Strings.Lookup(ent.Name)
 		if !found {
 			return nil, fmt.Errorf("block ID %d name not found in strings table", ent.ID)
