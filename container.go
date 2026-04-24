@@ -3,7 +3,6 @@ package goblin
 import (
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"slices"
 )
@@ -63,10 +62,6 @@ func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (
 	}
 
 	return id, nil
-}
-
-func (c *Container) Dump(w io.Writer, opts *DumpOpts) {
-
 }
 
 func (c *Container) Relations() Relations {
