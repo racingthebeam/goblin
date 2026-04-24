@@ -13,12 +13,12 @@ type BlockID uint32
 
 func (i BlockID) IsReserved() bool { return i >= 0xFFFF_FF00 }
 
-type BlockType uint32
-type BlockVersion uint16
-type BlockCompression uint16
+const (
+	BlockIDRelations = BlockID(0xFFFF_FF00)
+	BlockIDStrings   = BlockID(0xFFFF_FFFF)
+)
 
-func (bt BlockType) IsPublic() bool  { return bt&BlockType(0x8000_0000) == 0 }
-func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
+type BlockType uint32
 
 // Built-in block types
 const (
@@ -29,9 +29,30 @@ const (
 	BlockTypeBlob      = BlockType(5)
 )
 
+func (bt BlockType) IsPublic() bool  { return bt&BlockType(0x8000_0000) == 0 }
+func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
+
+type BlockVersion uint16
+
+type BlockCompression uint16
+
+func (c BlockCompression) String() string {
+	switch c {
+	case NoCompression:
+		return "none"
+	case GZip:
+		return "gzip"
+	case ZLib:
+		return "zlib"
+	default:
+		return "????"
+	}
+}
+
 const (
-	BlockIDRelations = BlockID(0xFFFF_FF00)
-	BlockIDStrings   = BlockID(0xFFFF_FFFF)
+	NoCompression = BlockCompression(0)
+	GZip          = BlockCompression(1)
+	ZLib          = BlockCompression(2)
 )
 
 type StringRef uint32
@@ -41,13 +62,19 @@ type BlockContent interface {
 	GoblinType() BlockType
 }
 
-const (
-	NoCompression = BlockCompression(0)
-	GZip          = BlockCompression(1)
-	ZLib          = BlockCompression(2)
-)
+type IndexEntry struct {
+	ID          BlockID          // 4
+	Type        BlockType        // 4
+	Name        StringRef        // 4
+	Version     BlockVersion     // 2
+	Compression BlockCompression // 2
+	Offset      int64            // 8
+	Size        int64            // 8
+}
 
 type BlockTypeHandler interface {
+	GoblinName() string
+
 	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
 
 	GoblinLint(c any) error

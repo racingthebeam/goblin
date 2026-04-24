@@ -10,17 +10,20 @@ import (
 )
 
 func testHandler(
+	name string,
 	enc func(*EncodeContext, io.Writer, any) (BlockVersion, error),
 	dec func(*DecodeContext, io.Reader, BlockVersion, int) (any, error),
 ) BlockTypeHandler {
-	return &th{enc: enc, dec: dec}
+	return &th{name: name, enc: enc, dec: dec}
 }
 
 type th struct {
-	enc func(*EncodeContext, io.Writer, any) (BlockVersion, error)
-	dec func(*DecodeContext, io.Reader, BlockVersion, int) (any, error)
+	name string
+	enc  func(*EncodeContext, io.Writer, any) (BlockVersion, error)
+	dec  func(*DecodeContext, io.Reader, BlockVersion, int) (any, error)
 }
 
+func (h *th) GoblinName() string                                  { return h.name }
 func (h *th) GoblinDump(w io.Writer, b any, opts *DumpOpts) error { return nil }
 func (h *th) GoblinLint(c any) error                              { return nil }
 func (h *th) GoblinCompression(v BlockVersion) BlockCompression   { return NoCompression }
@@ -43,6 +46,7 @@ func TestEncodeDecode(t *testing.T) {
 	}
 
 	r.RegisterBlockType(0x8000_0001, testHandler(
+		"testA",
 		func(ec *EncodeContext, w io.Writer, a any) (BlockVersion, error) {
 			name, _ := ec.Strings.Add(a.(*A).Name)
 			fp, _ := ec.Strings.Add(a.(*A).FavouritePet)
@@ -73,6 +77,7 @@ func TestEncodeDecode(t *testing.T) {
 	))
 
 	r.RegisterBlockType(0x8000_5000, testHandler(
+		"testB",
 		func(ec *EncodeContext, w io.Writer, a any) (BlockVersion, error) {
 			if _, err := w.Write(a.([]byte)); err != nil {
 				return 0, err

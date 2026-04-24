@@ -25,16 +25,6 @@ var (
 	indexZeroes = [indexEntrySize]byte{}
 )
 
-type indexEntry struct {
-	ID          BlockID          // 4
-	Type        BlockType        // 4
-	Name        StringRef        // 4
-	Version     BlockVersion     // 2
-	Compression BlockCompression // 2
-	Offset      int64            // 8
-	Size        int64            // 8
-}
-
 const (
 	indexEntrySize = 32
 )
@@ -57,13 +47,13 @@ func WithRegistry(r *Registry) Option {
 type Encoder struct {
 	w io.WriteSeeker
 
-	index []indexEntry
+	index []IndexEntry
 	c     *EncodeContext
 	reg   *Registry
 }
 
 func NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
-	e := &Encoder{w: w}
+	e := &Encoder{w: w, reg: globalRegistry}
 	for _, o := range opts {
 		o(e)
 	}
@@ -74,7 +64,7 @@ func (e *Encoder) Encode(c *Container) error {
 	// 2 extra blocks - strings and relations
 	blockCount := len(c.blocks) + 2
 
-	e.index = make([]indexEntry, 0, blockCount)
+	e.index = make([]IndexEntry, 0, blockCount)
 	e.c = NewEncodeContext()
 
 	if _, err := e.w.Write(header); err != nil {
@@ -131,13 +121,13 @@ func (e *Encoder) Encode(c *Container) error {
 	return nil
 }
 
-func (e *Encoder) writeBlock(b *Block) (indexEntry, error) {
+func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
 	hnd, found := e.reg.LookupBlockType(b.Type)
 	if !found {
-		return indexEntry{}, fmt.Errorf("no block type handler found for block type %d", b.Type)
+		return IndexEntry{}, fmt.Errorf("no block type handler found for block type %d", b.Type)
 	}
 
-	ent := indexEntry{ID: b.ID, Type: b.Type}
+	ent := IndexEntry{ID: b.ID, Type: b.Type}
 
 	name, _ := e.c.Strings.Add(b.Name)
 	ent.Name = name
@@ -152,28 +142,28 @@ func (e *Encoder) writeBlock(b *Block) (indexEntry, error) {
 	comp := hnd.GoblinCompression(0)
 	w, err := wrapWriter(e.w, comp)
 	if err != nil {
-		return indexEntry{}, err
+		return IndexEntry{}, err
 	}
 
 	ent.Compression = comp
 
 	if version, err := hnd.GoblinEncode(e.c, w, b.Data); err != nil {
-		return indexEntry{}, err
+		return IndexEntry{}, err
 	} else if err := w.Close(); err != nil {
-		return indexEntry{}, err
+		return IndexEntry{}, err
 	} else {
 		ent.Version = version
 	}
 
 	offset, err = e.w.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return indexEntry{}, err
+		return IndexEntry{}, err
 	}
 
 	ent.Size = offset - ent.Offset
 
 	if err := e.align4(); err != nil {
-		return indexEntry{}, err
+		return IndexEntry{}, err
 	}
 
 	return ent, nil
@@ -232,22 +222,37 @@ func NewEncodeContext() *EncodeContext {
 
 type Decoder struct {
 	r   io.ReadSeeker
-	c   *DecodeContext
 	reg *Registry
 }
 
 func NewDecoder(r io.ReadSeeker, opts ...Option) *Decoder {
-	d := &Decoder{r: r}
+	d := &Decoder{
+		r:   r,
+		reg: globalRegistry,
+	}
+
 	for _, o := range opts {
 		o(d)
 	}
+
 	return d
 }
 
 func (d *Decoder) Decode() (*Container, error) {
-	out := NewContainer()
+	if dc, err := d.DecodeHeader(); err != nil {
+		return nil, err
+	} else {
+		return d.DecodeBlocks(dc)
+	}
+}
+
+func (d *Decoder) DecodeHeader() (*DecodeContext, error) {
+	dc := newDecodeContext()
 
 	buf := make([]byte, indexEntrySize)
+
+	//
+	// Read header
 
 	n, err := d.r.Read(buf[0:12])
 	if err != nil {
@@ -258,20 +263,26 @@ func (d *Decoder) Decode() (*Container, error) {
 		return nil, errors.New("invalid header")
 	}
 
-	index := make([]indexEntry, binary.BigEndian.Uint32(buf[8:]))
+	//
+	// Load index
 
-	for i := range len(index) {
-		if err := d.readIndexEntry(&index[i], buf); err != nil {
+	dc.Index = make([]IndexEntry, binary.BigEndian.Uint32(buf[8:]))
+
+	for i := range len(dc.Index) {
+		if err := d.readIndexEntry(&dc.Index[i], buf); err != nil {
 			return nil, fmt.Errorf("failed to read index entry %d (%s)", i, err)
 		}
 	}
 
+	//
+	// Load strings
+
 	found := false
-	for i := range index {
-		if index[i].Type != BlockTypeStrings {
+	for i := range dc.Index {
+		if dc.Index[i].Type != BlockTypeStrings {
 			continue
 		}
-		block, err := d.readBlockFromEntry(&index[i])
+		block, err := d.readBlockFromEntry(dc, &dc.Index[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to read strings block (%s)", err)
 		}
@@ -279,7 +290,7 @@ func (d *Decoder) Decode() (*Container, error) {
 		if !ok {
 			return nil, errors.New("strings block returned incorrect data type")
 		}
-		d.c = NewDecodeContext(asStrings)
+		dc.Strings = asStrings
 		found = true
 	}
 
@@ -287,17 +298,42 @@ func (d *Decoder) Decode() (*Container, error) {
 		return nil, errors.New("strings block not found")
 	}
 
-	for i := range index {
-		if index[i].Type == BlockTypeStrings {
+	//
+	// Load relations
+
+	found = false
+	for i := range dc.Index {
+		if dc.Index[i].Type != BlockTypeRelations {
 			continue
-		} else if block, err := d.readBlockFromEntry(&index[i]); err != nil {
+		}
+		block, err := d.readBlockFromEntry(dc, &dc.Index[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to read relations block (%s)", err)
+		}
+		asRels, ok := block.Data.(Relations)
+		if !ok {
+			return nil, errors.New("relations block returned incorrect data type")
+		}
+		dc.Relations = asRels
+		found = true
+	}
+
+	if !found {
+		return nil, errors.New("relations block not found")
+	}
+
+	return dc, nil
+}
+
+func (d *Decoder) DecodeBlocks(dc *DecodeContext) (*Container, error) {
+	out := NewContainer()
+	out.relations = dc.Relations
+
+	for i := range dc.Index {
+		if dc.Index[i].Type == BlockTypeStrings || dc.Index[i].Type == BlockTypeRelations {
+			continue
+		} else if block, err := d.readBlockFromEntry(dc, &dc.Index[i]); err != nil {
 			return nil, err
-		} else if block.Type == BlockTypeRelations {
-			if rs, ok := block.Data.(Relations); !ok {
-				return nil, errors.New("relations block returned incorrect data type")
-			} else {
-				out.relations = rs
-			}
 		} else {
 			out.blocks[block.ID] = block
 		}
@@ -306,7 +342,7 @@ func (d *Decoder) Decode() (*Container, error) {
 	return out, nil
 }
 
-func (d *Decoder) readIndexEntry(dst *indexEntry, buf []byte) error {
+func (d *Decoder) readIndexEntry(dst *IndexEntry, buf []byte) error {
 	if _, err := io.ReadFull(d.r, buf); err != nil {
 		return fmt.Errorf("failed to read index entry (%s)", err)
 	}
@@ -320,7 +356,7 @@ func (d *Decoder) readIndexEntry(dst *indexEntry, buf []byte) error {
 	return nil
 }
 
-func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
+func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block, error) {
 	hnd, found := d.reg.LookupBlockType(ent.Type)
 	if !found {
 		return nil, fmt.Errorf("block ID %d has unknown type %d", ent.ID, ent.Type)
@@ -336,7 +372,7 @@ func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
 		return nil, fmt.Errorf("failed to wrap reader for block ID %d (%s)", ent.ID, err)
 	}
 
-	data, err := hnd.GoblinDecode(d.c, r, ent.Version, int(ent.Size))
+	data, err := hnd.GoblinDecode(dc, r, ent.Version, int(ent.Size))
 	if err != nil {
 		return nil, fmt.Errorf("block ID %d decode failed (%s)", ent.ID, err)
 	}
@@ -344,8 +380,8 @@ func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
 	// If the strings table is not populated it means we're reading the strings
 	// block itself. Just skip the lookup since it never has a name.
 	name := ""
-	if d.c != nil {
-		name, found = d.c.Strings.Lookup(ent.Name)
+	if dc.Strings != nil {
+		name, found = dc.Strings.Lookup(ent.Name)
 		if !found {
 			return nil, fmt.Errorf("block ID %d name not found in strings table", ent.ID)
 		}
@@ -363,11 +399,11 @@ func (d *Decoder) readBlockFromEntry(ent *indexEntry) (*Block, error) {
 // DecodeContext
 
 type DecodeContext struct {
-	Strings *Strings
+	Index     []IndexEntry
+	Strings   *Strings
+	Relations Relations
 }
 
-func NewDecodeContext(strings *Strings) *DecodeContext {
-	return &DecodeContext{
-		Strings: strings,
-	}
+func newDecodeContext() *DecodeContext {
+	return &DecodeContext{}
 }

@@ -8,6 +8,17 @@ import (
 
 type RelationKind uint32
 
+func (rk RelationKind) String() string {
+	switch rk {
+	case 1:
+		return "CONTAINS"
+	case 2:
+		return "REFERENCES"
+	default:
+		return "???"
+	}
+}
+
 const (
 	Contains        = RelationKind(1)
 	References      = RelationKind(2)
@@ -38,6 +49,8 @@ func (r Relations) ChildrenOf(dst []Relation, bid BlockID) []Relation {
 // Codec
 
 type relationsHandler struct{}
+
+func (h *relationsHandler) GoblinName() string { return "RELATIONS" }
 
 func (h *relationsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil

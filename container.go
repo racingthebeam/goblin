@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 )
 
 type Container struct {
@@ -13,8 +15,29 @@ type Container struct {
 
 func NewContainer() *Container {
 	return &Container{
-		blocks: map[BlockID]*Block{},
+		blocks:    map[BlockID]*Block{},
+		relations: Relations{},
 	}
+}
+
+func (c *Container) BlockIDs() []BlockID {
+	return slices.Sorted(maps.Keys(c.blocks))
+}
+
+func (c *Container) Block(id BlockID) (*Block, bool) {
+	b, ok := c.blocks[id]
+	return b, ok
+}
+
+// BlockData returns the data for the specified block ID, or false if there
+// is no such block. If et is non-zero, an additional check will be performed
+// to ensure the block's type matches the expected.
+func (c *Container) BlockData(id BlockID, et BlockType) (any, bool) {
+	b, ok := c.blocks[id]
+	if !ok || (et != 0 && et != b.Type) {
+		return nil, false
+	}
+	return b.Data, true
 }
 
 func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (BlockID, error) {
@@ -40,17 +63,6 @@ func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (
 	}
 
 	return id, nil
-}
-
-// BlockData returns the data for the specified block ID, or false if there
-// is no such block. If et is non-zero, an additional check will be performed
-// to ensure the block's type matches the expected.
-func (c *Container) BlockData(id BlockID, et BlockType) (any, bool) {
-	b, ok := c.blocks[id]
-	if !ok || (et != 0 && et != b.Type) {
-		return nil, false
-	}
-	return b.Data, true
 }
 
 func (c *Container) Dump(w io.Writer, opts *DumpOpts) {

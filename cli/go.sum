@@ -1,0 +1,4 @@
+github.com/alecthomas/kong v1.15.0 h1:BVJstKbpO73zKpmIu+m/aLRrNmWwxXPIGTNin9VmLVI=
+github.com/alecthomas/kong v1.15.0/go.mod h1:wrlbXem1CWqUV5Vbmss5ISYhsVPkBb1Yo7YKJghju2I=
+github.com/racingthebeam/goblin v0.0.0-20260424094445-8cc852798f01 h1:YKSYI8fVeF01lNHKCHA09SFWq1cxtwU5ArGiyMfJtg0=
+github.com/racingthebeam/goblin v0.0.0-20260424094445-8cc852798f01/go.mod h1:XwLwbmFVg8lw8rYMSZeOWHbiFZsUdAALykZZ3K+Z2Ug=

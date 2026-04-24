@@ -21,6 +21,10 @@ func NewStrings() *Strings {
 	}
 }
 
+func (s *Strings) All() []string {
+	return s.strings
+}
+
 func (s *Strings) Has(str string) bool {
 	if len(str) == 0 {
 		return true
@@ -60,6 +64,8 @@ func (s *Strings) Lookup(i StringRef) (string, bool) {
 }
 
 type stringsHandler struct{}
+
+func (h *stringsHandler) GoblinName() string { return "STRINGS" }
 
 func (h *stringsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil

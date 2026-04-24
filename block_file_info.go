@@ -6,6 +6,8 @@ type FileInfo struct{}
 
 type fileInfoHandler struct{}
 
+func (h *fileInfoHandler) GoblinName() string { return "FILEINFO" }
+
 func (h *fileInfoHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil
 }
