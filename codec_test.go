@@ -12,7 +12,7 @@ import (
 func testHandler(
 	name string,
 	enc func(*EncodeContext, io.Writer, any) (BlockVersion, error),
-	dec func(*DecodeContext, io.Reader, BlockVersion, int) (any, error),
+	dec func(*DecodeContext, io.Reader, BlockVersion, int64) (any, error),
 ) BlockTypeHandler {
 	return &th{name: name, enc: enc, dec: dec}
 }
@@ -20,7 +20,7 @@ func testHandler(
 type th struct {
 	name string
 	enc  func(*EncodeContext, io.Writer, any) (BlockVersion, error)
-	dec  func(*DecodeContext, io.Reader, BlockVersion, int) (any, error)
+	dec  func(*DecodeContext, io.Reader, BlockVersion, int64) (any, error)
 }
 
 func (h *th) GoblinName() string                                  { return h.name }
@@ -32,7 +32,7 @@ func (h *th) GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion,
 	return h.enc(dst, w, c)
 }
 
-func (h *th) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int) (any, error) {
+func (h *th) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error) {
 	return h.dec(src, r, ver, size)
 }
 
@@ -55,7 +55,7 @@ func TestEncodeDecode(t *testing.T) {
 			binary.Write(w, binary.BigEndian, uint32(a.(*A).Age))
 			return 1, nil
 		},
-		func(dc *DecodeContext, r io.Reader, bv BlockVersion, i int) (any, error) {
+		func(dc *DecodeContext, r io.Reader, bv BlockVersion, i int64) (any, error) {
 			var (
 				nameRef uint32
 				fpRef   uint32
@@ -84,7 +84,7 @@ func TestEncodeDecode(t *testing.T) {
 			}
 			return 1, nil
 		},
-		func(dc *DecodeContext, r io.Reader, bv BlockVersion, i int) (any, error) {
+		func(dc *DecodeContext, r io.Reader, bv BlockVersion, i int64) (any, error) {
 			chunk := make([]byte, i)
 			if _, err := io.ReadFull(r, chunk); err != nil {
 				return nil, err

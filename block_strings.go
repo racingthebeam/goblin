@@ -107,7 +107,7 @@ func (h *stringsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (Bl
 	return 1, nil
 }
 
-func (h *stringsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+func (h *stringsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
 	r = &io.LimitedReader{R: r, N: int64(size)}
 
 	s := bufio.NewScanner(r)

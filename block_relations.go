@@ -97,7 +97,7 @@ func (h *relationsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (
 	return 1, nil
 }
 
-func (h *relationsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+func (h *relationsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
 	if size%relationRecordLength != 0 {
 		return nil, fmt.Errorf("relation block size must be multiple of %d", relationRecordLength)
 	}

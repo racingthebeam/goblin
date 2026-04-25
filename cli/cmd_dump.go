@@ -34,7 +34,7 @@ func (c *CmdDump) Run() error {
 			typeName = hnd.GoblinName()
 		}
 
-		fmt.Printf("0x%08X 0x%08X (%16s) %16s %4d %s %8d %8d\n",
+		fmt.Printf("0x%08X 0x%08X (%16s) %16s %4d %s %8d %8d %8d\n",
 			ent.ID,
 			ent.Type,
 			typeName,
@@ -42,7 +42,8 @@ func (c *CmdDump) Run() error {
 			ent.Version,
 			ent.Compression,
 			ent.Offset,
-			ent.Size,
+			ent.DataSize,
+			ent.CompressedSize,
 		)
 	}
 

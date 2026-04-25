@@ -63,13 +63,14 @@ type BlockContent interface {
 }
 
 type IndexEntry struct {
-	ID          BlockID          // 4
-	Type        BlockType        // 4
-	Name        StringRef        // 4
-	Version     BlockVersion     // 2
-	Compression BlockCompression // 2
-	Offset      int64            // 8
-	Size        int64            // 8
+	ID             BlockID          // 4
+	Type           BlockType        // 4
+	Name           StringRef        // 4
+	Version        BlockVersion     // 2
+	Compression    BlockCompression // 2
+	Offset         int64            // 8
+	DataSize       uint32           // 4
+	CompressedSize uint32           // 4
 }
 
 type BlockTypeHandler interface {
@@ -92,7 +93,7 @@ type BlockTypeHandler interface {
 	// Encode the block to the target writer, returning the version number.
 	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
 
-	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int) (any, error)
+	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
 }
 
 const (

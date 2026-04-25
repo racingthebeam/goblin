@@ -24,6 +24,6 @@ func (h *fileInfoHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (B
 	return 1, nil
 }
 
-func (h *fileInfoHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+func (h *fileInfoHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
 	return &FileInfo{}, nil
 }

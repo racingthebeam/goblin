@@ -43,7 +43,9 @@ func (h *blobHandler) GoblinLint(c any) error {
 	return nil
 }
 
-func (h *blobHandler) GoblinCompression(version BlockVersion) BlockCompression { return NoCompression }
+func (h *blobHandler) GoblinCompression(version BlockVersion) BlockCompression {
+	return NoCompression
+}
 
 func (h *blobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	b, ok := c.(Blob)
@@ -57,7 +59,7 @@ func (h *blobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (Block
 	return 1, nil
 }
 
-func (h *blobHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int) (any, error) {
+func (h *blobHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
 	out := make(Blob, size)
 	if _, err := io.ReadFull(r, out); err != nil {
 		return nil, err

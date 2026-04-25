@@ -155,12 +155,14 @@ func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
 		ent.Version = version
 	}
 
+	ent.DataSize = uint32(w.Written)
+
 	offset, err = e.w.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return IndexEntry{}, err
 	}
 
-	ent.Size = offset - ent.Offset
+	ent.CompressedSize = uint32(offset - ent.Offset)
 
 	if err := e.align4(); err != nil {
 		return IndexEntry{}, err
@@ -181,8 +183,9 @@ func (e *Encoder) writeIndex(offset int64) error {
 		err4 := binary.Write(e.w, binary.BigEndian, ie.Version)
 		err5 := binary.Write(e.w, binary.BigEndian, ie.Compression)
 		err6 := binary.Write(e.w, binary.BigEndian, ie.Offset)
-		err7 := binary.Write(e.w, binary.BigEndian, ie.Size)
-		if err := anyErr(err1, err2, err3, err4, err5, err6, err7); err != nil {
+		err7 := binary.Write(e.w, binary.BigEndian, ie.DataSize)
+		err8 := binary.Write(e.w, binary.BigEndian, ie.CompressedSize)
+		if err := anyErr(err1, err2, err3, err4, err5, err6, err7, err8); err != nil {
 			return fmt.Errorf("failed to write index entry %d (%s)", i, err)
 		}
 	}
@@ -352,7 +355,8 @@ func (d *Decoder) readIndexEntry(dst *IndexEntry, buf []byte) error {
 	dst.Version = BlockVersion(binary.BigEndian.Uint16(buf[12:14]))
 	dst.Compression = BlockCompression(binary.BigEndian.Uint16(buf[14:16]))
 	dst.Offset = int64(binary.BigEndian.Uint64(buf[16:24]))
-	dst.Size = int64(binary.BigEndian.Uint64(buf[24:32]))
+	dst.DataSize = binary.BigEndian.Uint32(buf[24:28])
+	dst.CompressedSize = binary.BigEndian.Uint32(buf[28:32])
 	return nil
 }
 
@@ -367,12 +371,12 @@ func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block
 		return nil, fmt.Errorf("failed to seek to start of block ID %d (%s)", ent.ID, err)
 	}
 
-	r, err := wrapReader(&io.LimitedReader{R: d.r, N: ent.Size}, ent.Compression)
+	r, err := wrapReader(&io.LimitedReader{R: d.r, N: int64(ent.CompressedSize)}, ent.Compression)
 	if err != nil {
 		return nil, fmt.Errorf("failed to wrap reader for block ID %d (%s)", ent.ID, err)
 	}
 
-	data, err := hnd.GoblinDecode(dc, r, ent.Version, int(ent.Size))
+	data, err := hnd.GoblinDecode(dc, r, ent.Version, int64(ent.DataSize))
 	if err != nil {
 		return nil, fmt.Errorf("block ID %d decode failed (%s)", ent.ID, err)
 	}
