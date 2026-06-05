@@ -1,5 +1,7 @@
 # goblin
 
+Goblin is a generic block-based container format for binary data with support for string interning, block relationship modelling and per-block compression. It was extracted from the [BEAM256 Low-Level Fantasy Console project](https://github.com/racingthebeam/beam256).
+
 ## Concepts
 
   - Block ID - a 32 bit unsigned integer, greater than zero, that uniquely identifies each block in a container. Block IDs may be manually allocated, or auto-generated when a block is attached. Whether or not block IDs are meaningful is dependent on the project - simple projects may stick to a set of well-known IDs, whereas larger projects with dynamic data may need to be more generic. A handful of block IDs (>= `0xFFFF0000`) are reserved for internal use (e.g. string and relation tables).
