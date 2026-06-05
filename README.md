@@ -15,6 +15,42 @@ Goblin is a generic block-based container format for binary data with support fo
   - Block ID - a 32 bit unsigned integer, greater than zero, that uniquely identifies each block in a container. Block IDs may be manually allocated, or auto-generated when a block is attached. Whether or not block IDs are meaningful is dependent on the project - simple projects may stick to a set of well-known IDs, whereas larger projects with dynamic data may need to be more generic. A handful of block IDs (>= `0xFFFF0000`) are reserved for internal use (e.g. string and relation tables).
   - Block type - again, a 32 bit unsigned integer, greater than zero, that specifies the type of each block. The block type is directly used to map on-disk blocks to their corresponding `BlockTypeHandler` instances, via a `Registry`. The block type's MSB specifies whether the block type is **public** (MSB set) or **private** (MSB unset). Private block types are intended for internal use by users, without expectation that they will not clash with other users' private block types. For use cases requiring public interop, see [Public Block Types](PUBLIC_BLOCK_TYPES.md))
 
+## Basic Usage
+
+```golang
+const (
+    // Each block type has its own ID
+    // For private/internal use, you are free to allocate your own
+    blockTypeA = 1
+    blockTypeB = 2
+)
+
+func main() {
+    // This is the data we want to store in the container - arbitrary Go types
+    // Each type has its own registered BlockTypeHandler that is responsible
+    // for encoding/decoding (see Custom Blocks, below).
+    data1 := &MyDataObjectA{}
+    data2 := &MyDataObjectB{}
+
+    // Create a new container and insert the blocks
+    c := goblin.NewContainer()
+    c.SetBlock(0, blockTypeA, "data_a", data1)
+    c.SetBlock(1, blockTypeB, "data_b", data2)
+
+    // data2 is a logical child of data1, so insert a relationship
+    c.AddRelation(data1, data2, goblin.Contains, "child")
+
+    // Encode the container to a file
+    fw, _ := os.Create("out.goblin")
+    NewEncoder(fw).Encode(c)
+    fw.Close()
+
+    // Now read it back from the same file into a new instance
+    fr, _ := os.Open("out.goblin")
+    newContainer, _ := NewDecoder(fh).Decode()
+}
+```
+
 ## Custom Blocks
 
 Support for custom block types is implemented by creating a handler conforming to the `BlockTypeHandler` interface and then registering it with a `Registry` (either implicit or explicit).
