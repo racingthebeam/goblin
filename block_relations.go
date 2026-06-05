@@ -56,7 +56,7 @@ func (h *relationsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error 
 	return nil
 }
 
-func (h *relationsHandler) GoblinLint(c any) error {
+func (h *relationsHandler) GoblinValidate(c any) error {
 	rs, ok := c.(Relations)
 	if !ok {
 		return ErrInvalidDataType

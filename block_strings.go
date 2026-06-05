@@ -71,7 +71,7 @@ func (h *stringsHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil
 }
 
-func (h *stringsHandler) GoblinLint(c any) error {
+func (h *stringsHandler) GoblinValidate(c any) error {
 	ss, ok := c.(*Strings)
 	if !ok {
 		return ErrInvalidDataType

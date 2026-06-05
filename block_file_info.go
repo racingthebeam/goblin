@@ -12,7 +12,7 @@ func (h *fileInfoHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil
 }
 
-func (h *fileInfoHandler) GoblinLint(c any) error {
+func (h *fileInfoHandler) GoblinValidate(c any) error {
 	return nil
 }
 

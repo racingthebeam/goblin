@@ -35,7 +35,7 @@ func (h *blobHandler) renderBytes(w io.Writer, bs []byte) {
 	fmt.Fprintf(w, "%+v\n", bs)
 }
 
-func (h *blobHandler) GoblinLint(c any) error {
+func (h *blobHandler) GoblinValidate(c any) error {
 	_, ok := c.(Blob)
 	if !ok {
 		return ErrInvalidDataType

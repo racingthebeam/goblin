@@ -25,7 +25,7 @@ Support for custom block types is implemented by creating a handler conforming t
 type BlockTypeHandler interface {
 	GoblinName() string
 	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
-	GoblinLint(c any) error
+	GoblinValidate(c any) error
 	GoblinCompression(version BlockVersion) BlockCompression
 	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
 	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
