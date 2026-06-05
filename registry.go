@@ -55,13 +55,13 @@ func (r *Registry) RegisterBlockType(bt BlockType, hnd BlockTypeHandler) {
 	r.blockTypes[bt] = hnd
 }
 
-// NewEncoder() returns an NewEncoder preconfigured to use this Registry.
+// NewEncoder() returns an Encoder preconfigured to use this Registry.
 func (r *Registry) NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
 	opts = append(opts, WithRegistry(r))
 	return NewEncoder(w, opts...)
 }
 
-// NewDecoder() returns an NewDecoder preconfigured to use this Registry.
+// NewDecoder() returns a Decoder preconfigured to use this Registry.
 func (r *Registry) NewDecoder(w io.ReadSeeker, opts ...Option) *Decoder {
 	opts = append(opts, WithRegistry(r))
 	return NewDecoder(w, opts...)
