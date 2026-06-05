@@ -42,7 +42,7 @@ By convention, built-in block types have `UPPERCASE` names and all others are `l
 
 Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. `opts` specifies the desired verbosity (summary/preview/full), and whether output should be colorized.
 
-#### `GolinLint(b any) error`
+#### `GolinValidate(b any) error`
 
 Check block data `b` for validity.
 
