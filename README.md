@@ -15,7 +15,11 @@ Goblin is a generic block-based container format for binary data with support fo
   - Block ID - a 32 bit unsigned integer, greater than zero, that uniquely identifies each block in a container. Block IDs may be manually allocated, or auto-generated when a block is attached. Whether or not block IDs are meaningful is dependent on the project - simple projects may stick to a set of well-known IDs, whereas larger projects with dynamic data may need to be more generic. A handful of block IDs (>= `0xFFFF0000`) are reserved for internal use (e.g. string and relation tables).
   - Block type - again, a 32 bit unsigned integer, greater than zero, that specifies the type of each block. The block type is directly used to map on-disk blocks to their corresponding `BlockTypeHandler` instances, via a `Registry`. The block type's MSB specifies whether the block type is **public** (MSB set) or **private** (MSB unset). Private block types are intended for internal use by users, without expectation that they will not clash with other users' private block types. For use cases requiring public interop, see [Public Block Types](PUBLIC_BLOCK_TYPES.md))
 
-## Implementing Custom Blocks
+## Custom Blocks
+
+Support for custom block types is implemented by creating a handler conforming to the `BlockTypeHandler` interface and then registering it with a `Registry` (either implicit or explicit).
+
+### `BlockTypeHandler` Implementation
 
 ```
 type BlockTypeHandler interface {
@@ -36,7 +40,7 @@ By convention, built-in block types have `UPPERCASE` names and all others are `l
 
 #### `GoblinDump(w io.Writer, b any, opts *DumpOpts) error`
 
-Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. `opts` includes flags that specify the desired level of verbosity (summary/preview/full), and whether or not output should be colorized.
+Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. `opts` specifies the desired verbosity (summary/preview/full), and whether output should be colorized.
 
 #### `GolinLint(b any) error`
 
@@ -56,11 +60,15 @@ If the block includes string data, these may be interned by using `dst.Strings.A
 
 Decode block data from `r` and return it as a fully hydrated object. Version `v` is that which is stored in the on-disk block index - the decoder must inspect this and select the appropriate decode strategy.
 
-`size` is the full, uncompressed size of the block's data, and `r` will be limited to reading this number of bytes so there is no risk of overshooting the block bounds.
+`size` is the full, uncompressed size of the block's data, and `r` is limited to reading this number of bytes so there is no risk of overshooting the block bounds.
 
 If the block includes interned string data, decode this using `src.Strings.Lookup()`.
 
-## Registering Blocks
+### Block Handler Registration
+
+To register a block type with the default/implicit registry, use `goblin.RegisterBlockType()`.
+
+This should be suitable for most use-cases, and is required when using Goblin's built-in CLI functionality.
 
 ```golang
 func init() {
@@ -68,6 +76,8 @@ func init() {
     goblin.RegisterBlockType(myBlockType, myHandler)
 }
 ```
+
+For more complex scenarios it may be necessary to use a custom `Registry`:
 
 ```golang
 func customRegistryExample() {
@@ -78,6 +88,8 @@ func customRegistryExample() {
     reg.RegisterBlockType(myBlockType, &MyCoolBlockTypeHandler{})
 }
 ```
+
+When using custom regstries, use `registry.NewEncoder()`/`registry.NewDecoder()` to create encoders/decoders that are preconfigured for use with the given registry. Alternatively, the `WithRegistry()` option can also be passed to the naked encoder/decoder constructors.
 
 ## Built-in Block Types
 

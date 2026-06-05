@@ -82,7 +82,7 @@ type BlockTypeHandler interface {
 
 	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
 
-	GoblinLint(c any) error
+	GoblinLint(b any) error
 
 	// Returns the compression type employed by the given version number.
 	// This method is used to wrap to readers/writers passed into GoblinDecode()
@@ -95,7 +95,7 @@ type BlockTypeHandler interface {
 	GoblinCompression(version BlockVersion) BlockCompression
 
 	// Encode the block to the target writer, returning the version number.
-	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
+	GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)
 
 	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
 }
