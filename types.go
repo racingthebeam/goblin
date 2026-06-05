@@ -9,27 +9,31 @@ var (
 	ErrInvalidDataType = errors.New("invalid data type")
 )
 
+const reservedBlockIDBase = 0xFFFF_0000
+
 type BlockID uint32
 
-func (i BlockID) IsReserved() bool { return i >= 0xFFFF_FF00 }
+func (i BlockID) IsReserved() bool { return i >= reservedBlockIDBase }
 
 const (
-	BlockIDRelations = BlockID(0xFFFF_FF00)
-	BlockIDStrings   = BlockID(0xFFFF_FFFF)
+	BlockIDRelations = BlockID(reservedBlockIDBase + iota)
+	BlockIDStrings
 )
 
 type BlockType uint32
 
+const PublicBlockTypeBase = 0x8000_0000
+
 // Built-in block types
 const (
-	BlockTypeFileInfo  = BlockType(1)
-	BlockTypeStrings   = BlockType(2)
-	BlockTypeRelations = BlockType(3)
-	BlockTypeMetadata  = BlockType(4)
-	BlockTypeBlob      = BlockType(5)
+	BlockTypeFileInfo = BlockType(PublicBlockTypeBase + iota)
+	BlockTypeStrings
+	BlockTypeRelations
+	BlockTypeMetadata
+	BlockTypeBlob
 )
 
-func (bt BlockType) IsPublic() bool  { return bt&BlockType(0x8000_0000) == 0 }
+func (bt BlockType) IsPublic() bool  { return bt&BlockType(PublicBlockTypeBase) != 0 }
 func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
 
 type BlockVersion uint16

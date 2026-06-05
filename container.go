@@ -19,10 +19,12 @@ func NewContainer() *Container {
 	}
 }
 
+// BlockIDs returns a sorted list of all block IDs in this container.
 func (c *Container) BlockIDs() []BlockID {
 	return slices.Sorted(maps.Keys(c.blocks))
 }
 
+// Block returns the Block associated with the given ID, or nil if no such block exists.
 func (c *Container) Block(id BlockID) (*Block, bool) {
 	b, ok := c.blocks[id]
 	return b, ok
@@ -45,7 +47,7 @@ func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (
 	}
 
 	if id == 0 {
-		// TODO: generate ID
+		id = c.generateBlockID()
 	}
 
 	if _, exists := c.blocks[id]; exists {
@@ -75,4 +77,14 @@ func (c *Container) FirstBlockOfType(typ BlockType) *Block {
 		}
 	}
 	return nil
+}
+
+func (c *Container) generateBlockID() BlockID {
+	for i := BlockID(1); i < BlockReserved; i++ {
+		_, exists := c.blocks[i]
+		if !exists {
+			return i
+		}
+	}
+	panic("failed to generate block ID, file full!")
 }
