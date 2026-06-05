@@ -28,31 +28,31 @@ type BlockTypeHandler interface {
 }
 ```
 
-##### `GoblinName() string`
+#### `GoblinName() string`
 
 Returns the name of this block type, used for diagnostics only.
 
 By convention, built-in block types have `UPPERCASE` names and all others are `lowercase`.
 
-##### `GoblinDump(w io.Writer, b any, opts *DumpOpts) error`
+#### `GoblinDump(w io.Writer, b any, opts *DumpOpts) error`
 
 Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. `opts` includes flags that specify the desired level of verbosity (summary/preview/full), and whether or not output should be colorized.
 
-##### `GolinLint(b any) error`
+#### `GolinLint(b any) error`
 
 Check block data `b` for validity.
 
-##### `GoblinCompression() BlockCompression`
+#### `GoblinCompression() BlockCompression`
 
 Returns the desired compression setting (`NoCompression`, `GZip`, `ZLib`) to be employed when encoding new block data.
 
-##### `GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)`
+#### `GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)`
 
 Encode block data `b` to `w`, returning a version number describing the encoded format.
 
 If the block includes string data, these may be interned by using `dst.Strings.Add()`.
 
-##### `GoblinDecode(src *DecodeContext, r io.Reader, v BlockVersion, size int64) (any, error)`
+#### `GoblinDecode(src *DecodeContext, r io.Reader, v BlockVersion, size int64) (any, error)`
 
 Decode block data from `r` and return it as a fully hydrated object. Version `v` is that which is stored in the on-disk block index - the decoder must inspect this and select the appropriate decode strategy.
 
