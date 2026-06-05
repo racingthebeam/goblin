@@ -33,9 +33,11 @@ func main() {
     data2 := &MyDataObjectB{}
 
     // Create a new container and insert the blocks
+    // Specify block ID as 0 so the container auto-generates a valid value
     c := goblin.NewContainer()
-    c.SetBlock(0, blockTypeA, "data_a", data1)
-    c.SetBlock(1, blockTypeB, "data_b", data2)
+    id1, _ := c.SetBlock(0, blockTypeA, "data_a", data1)
+    id2, _ := c.SetBlock(0, blockTypeB, "data_b", data2)
+    log.Printf("Inserted block IDs %d and %d", id1, id2)
 
     // data2 is a logical child of data1, so insert a relationship
     c.AddRelation(data1, data2, goblin.Contains, "child")
@@ -48,6 +50,16 @@ func main() {
     // Now read it back from the same file into a new instance
     fr, _ := os.Open("out.goblin")
     newContainer, _ := NewDecoder(fh).Decode()
+
+    // Fetch a block directly by ID...
+    block1 := newContainer.Block(id1)
+
+    // or fetch its data, with optional type guard:
+    block1Data, _ := newContainer.BlockData(id1, blockTypeA)
+    log.Printf("%s", block1Data.(*MyDataObjectA).SomeField)
+
+    // or look up a block up by type, regardless of ID
+    block2 := newContainer.FirstBlockOfType(blockTypeB)
 }
 ```
 
