@@ -11,6 +11,8 @@ var (
 
 type BlockID uint32
 
+func (b BlockID) Valid() bool { return b != 0 }
+
 const reservedBlockIDBase = 0xFFFF_0000
 
 func (i BlockID) IsReserved() bool { return i >= reservedBlockIDBase }
@@ -21,6 +23,8 @@ const (
 )
 
 type BlockType uint32
+
+func (bt BlockType) Valid() bool { return bt != 0 }
 
 const PublicBlockTypeBase = 0x8000_0000
 
@@ -84,7 +88,7 @@ type BlockTypeHandler interface {
 
 	GoblinValidate(b any) error
 
-	// Returns the compression type employed by the given version number.
+	// Returns the compression type/level employed by the given version number.
 	// This method is used to wrap to readers/writers passed into GoblinDecode()
 	// and GoblinEncode().
 	//
@@ -92,7 +96,7 @@ type BlockTypeHandler interface {
 	// whatever compression type is required for newly written blocks
 	// i.e. that matching the version number ultimately returned by
 	// GoblinEncode().
-	GoblinCompression(version BlockVersion) BlockCompression
+	GoblinCompression() (BlockCompression, int)
 
 	// Encode the block to the target writer, returning the version number.
 	GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)

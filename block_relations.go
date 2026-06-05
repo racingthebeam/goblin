@@ -36,15 +36,6 @@ type Relation struct {
 
 type Relations []Relation
 
-func (r Relations) ChildrenOf(dst []Relation, bid BlockID) []Relation {
-	for i := range r {
-		if r[i].FromBlockID == bid && r[i].Kind == Contains {
-			dst = append(dst, r[i])
-		}
-	}
-	return dst
-}
-
 //
 // Codec
 
@@ -73,8 +64,8 @@ func (h *relationsHandler) GoblinValidate(c any) error {
 	return nil
 }
 
-func (h *relationsHandler) GoblinCompression(version BlockVersion) BlockCompression {
-	return NoCompression
+func (h *relationsHandler) GoblinCompression() (BlockCompression, int) {
+	return NoCompression, 0
 }
 
 func (h *relationsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {

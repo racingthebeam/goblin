@@ -139,8 +139,8 @@ func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
 
 	ent.Offset = offset
 
-	comp := hnd.GoblinCompression(0)
-	w, err := wrapWriter(e.w, comp)
+	comp, level := hnd.GoblinCompression()
+	w, err := wrapWriter(e.w, comp, level)
 	if err != nil {
 		return IndexEntry{}, err
 	}

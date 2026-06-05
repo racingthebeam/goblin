@@ -16,14 +16,22 @@ func anyErr(errors ...error) error {
 	return nil
 }
 
-func wrapWriter(w io.Writer, c BlockCompression) (*countingWriter, error) {
+func wrapWriter(w io.Writer, c BlockCompression, level int) (*countingWriter, error) {
 	switch c {
 	case NoCompression:
 		return &countingWriter{w: w}, nil
 	case GZip:
-		return &countingWriter{w: gzip.NewWriter(w), c: true}, nil
+		cw, err := gzip.NewWriterLevel(w, level)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip writer (%s)", err)
+		}
+		return &countingWriter{w: cw, close: true}, nil
 	case ZLib:
-		return &countingWriter{w: zlib.NewWriter(w), c: true}, nil
+		cw, err := zlib.NewWriterLevel(w, level)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create zlib writer (%s)", err)
+		}
+		return &countingWriter{w: cw, close: true}, nil
 	default:
 		return nil, fmt.Errorf("unknown compression type %d", c)
 	}
@@ -32,7 +40,7 @@ func wrapWriter(w io.Writer, c BlockCompression) (*countingWriter, error) {
 type countingWriter struct {
 	Written int
 	w       io.Writer
-	c       bool
+	close   bool
 }
 
 func (w *countingWriter) Write(p []byte) (int, error) {
@@ -42,7 +50,7 @@ func (w *countingWriter) Write(p []byte) (int, error) {
 }
 
 func (w *countingWriter) Close() error {
-	if wc, ok := w.w.(io.WriteCloser); w.c && ok {
+	if wc, ok := w.w.(io.WriteCloser); w.close && ok {
 		return wc.Close()
 	}
 	return nil

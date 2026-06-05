@@ -66,21 +66,68 @@ func (c *Container) SetBlock(id BlockID, typ BlockType, name string, data any) (
 	return id, nil
 }
 
+// Returns the table of relations. Returned value must not be mutated.
 func (c *Container) Relations() Relations {
 	return c.relations
 }
 
-func (c *Container) FirstBlockOfType(typ BlockType) *Block {
+// Returns the first block with the given type. Check existence with block.Valid().
+func (c *Container) FirstBlockOfType(typ BlockType) Block {
 	for _, b := range c.blocks {
 		if b.Type == typ {
-			return b
+			return *b
 		}
 	}
-	return nil
+	return Block{}
+}
+
+// Returns a list of the given block's children; that is, all related blocks
+// whose relation type is Contains.
+func (c *Container) Children(id BlockID) []Block {
+	out := make([]Block, 0)
+	for i := range c.relations {
+		r := &c.relations[i]
+		if r.FromBlockID == id && r.Kind == Contains {
+			b := c.blocks[r.ToBlockID]
+			if b != nil {
+				out = append(out, *c.blocks[r.ToBlockID])
+			}
+		}
+	}
+	return out
+}
+
+// Returns the first encountered child block with a given type.
+func (c *Container) FirstChildOfType(id BlockID, t BlockType) Block {
+	for i := range c.relations {
+		r := &c.relations[i]
+		if r.FromBlockID == id && r.Kind == Contains {
+			b := c.blocks[r.ToBlockID]
+			if b != nil && b.Type == t {
+				return *b
+			}
+		}
+	}
+	return Block{}
+}
+
+// Returns all child blocks with a given type.
+func (c *Container) ChildrenOfType(id BlockID, t BlockType) []Block {
+	out := make([]Block, 0)
+	for i := range c.relations {
+		r := &c.relations[i]
+		if r.FromBlockID == id && r.Kind == Contains {
+			b := c.blocks[r.ToBlockID]
+			if b != nil && b.Type == t {
+				out = append(out, *b)
+			}
+		}
+	}
+	return out
 }
 
 func (c *Container) generateBlockID() BlockID {
-	for i := BlockID(1); i < BlockReserved; i++ {
+	for i := BlockID(1); i < reservedBlockIDBase; i++ {
 		_, exists := c.blocks[i]
 		if !exists {
 			return i

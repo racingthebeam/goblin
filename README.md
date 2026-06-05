@@ -67,6 +67,8 @@ func main() {
 
 Support for custom block types is implemented by creating a handler conforming to the `BlockTypeHandler` interface and then registering it with a `Registry` (either implicit or explicit).
 
+**Note:** block types manipulated by `BlockTypeHandler` instances should be reference types (struct pointers, or maps/slices).
+
 ### `BlockTypeHandler` Implementation
 
 ```
@@ -74,7 +76,7 @@ type BlockTypeHandler interface {
 	GoblinName() string
 	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
 	GoblinValidate(c any) error
-	GoblinCompression(version BlockVersion) BlockCompression
+	GoblinCompression() BlockCompression
 	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
 	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
 }
@@ -94,9 +96,9 @@ Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. 
 
 Check block data `b` for validity.
 
-#### `GoblinCompression() BlockCompression`
+#### `GoblinCompression() (BlockCompression, int)`
 
-Returns the desired compression setting (`NoCompression`, `GZip`, `ZLib`) to be employed when encoding new block data.
+Returns the desired compression setting (`NoCompression`, `GZip`, `ZLib`) to be employed when encoding new block data. The second return value is the compression level, e.g. `flate.DefaultCompression` (ignored when compression is disabled).
 
 #### `GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)`
 

@@ -16,8 +16,8 @@ func (h *fileInfoHandler) GoblinValidate(c any) error {
 	return nil
 }
 
-func (h *fileInfoHandler) GoblinCompression(version BlockVersion) BlockCompression {
-	return NoCompression
+func (h *fileInfoHandler) GoblinCompression() (BlockCompression, int) {
+	return NoCompression, 0
 }
 
 func (h *fileInfoHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {

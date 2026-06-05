@@ -84,8 +84,8 @@ func (h *stringsHandler) GoblinValidate(c any) error {
 	return nil
 }
 
-func (h *stringsHandler) GoblinCompression(version BlockVersion) BlockCompression {
-	return NoCompression
+func (h *stringsHandler) GoblinCompression() (BlockCompression, int) {
+	return NoCompression, 0
 }
 
 var nul = []byte{0}

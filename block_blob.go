@@ -43,8 +43,8 @@ func (h *blobHandler) GoblinValidate(c any) error {
 	return nil
 }
 
-func (h *blobHandler) GoblinCompression(version BlockVersion) BlockCompression {
-	return NoCompression
+func (h *blobHandler) GoblinCompression() (BlockCompression, int) {
+	return NoCompression, 0
 }
 
 func (h *blobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {

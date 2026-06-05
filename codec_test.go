@@ -26,7 +26,7 @@ type th struct {
 func (h *th) GoblinName() string                                  { return h.name }
 func (h *th) GoblinDump(w io.Writer, b any, opts *DumpOpts) error { return nil }
 func (h *th) GoblinValidate(c any) error                          { return nil }
-func (h *th) GoblinCompression(v BlockVersion) BlockCompression   { return NoCompression }
+func (h *th) GoblinCompression() (BlockCompression, int)          { return NoCompression, 0 }
 
 func (h *th) GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	return h.enc(dst, w, c)
