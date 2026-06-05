@@ -9,9 +9,9 @@ var (
 	ErrInvalidDataType = errors.New("invalid data type")
 )
 
-const reservedBlockIDBase = 0xFFFF_0000
-
 type BlockID uint32
+
+const reservedBlockIDBase = 0xFFFF_0000
 
 func (i BlockID) IsReserved() bool { return i >= reservedBlockIDBase }
 
