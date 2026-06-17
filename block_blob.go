@@ -7,11 +7,15 @@ import (
 
 type Blob []byte
 
-type blobHandler struct{}
+type BlobHandler struct {
+	Name             string
+	Compression      BlockCompression
+	CompressionLevel int
+}
 
-func (h *blobHandler) GoblinName() string { return "BLOB" }
+func (h *BlobHandler) GoblinName() string { return h.Name }
 
-func (h *blobHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
+func (h *BlobHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	blob := b.(Blob)
 
 	switch opts.Verbose {
@@ -31,11 +35,11 @@ func (h *blobHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	return nil
 }
 
-func (h *blobHandler) renderBytes(w io.Writer, bs []byte) {
+func (h *BlobHandler) renderBytes(w io.Writer, bs []byte) {
 	fmt.Fprintf(w, "%+v\n", bs)
 }
 
-func (h *blobHandler) GoblinValidate(c any) error {
+func (h *BlobHandler) GoblinValidate(c any) error {
 	_, ok := c.(Blob)
 	if !ok {
 		return ErrInvalidDataType
@@ -43,11 +47,11 @@ func (h *blobHandler) GoblinValidate(c any) error {
 	return nil
 }
 
-func (h *blobHandler) GoblinCompression() (BlockCompression, int) {
-	return NoCompression, 0
+func (h *BlobHandler) GoblinCompression() (BlockCompression, int) {
+	return h.Compression, h.CompressionLevel
 }
 
-func (h *blobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
+func (h *BlobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	b, ok := c.(Blob)
 	if !ok {
 		return 0, ErrInvalidDataType
@@ -59,7 +63,7 @@ func (h *blobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (Block
 	return 1, nil
 }
 
-func (h *blobHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
+func (h *BlobHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
 	out := make(Blob, size)
 	if _, err := io.ReadFull(r, out); err != nil {
 		return nil, err

@@ -31,7 +31,7 @@ func NewRegistry() *Registry {
 	r.RegisterBlockType(BlockTypeRelations, &relationsHandler{})
 	r.RegisterBlockType(BlockTypeStrings, &stringsHandler{})
 	r.RegisterBlockType(BlockTypeFileInfo, &fileInfoHandler{})
-	r.RegisterBlockType(BlockTypeBlob, &blobHandler{})
+	r.RegisterBlockType(BlockTypeBlob, &BlobHandler{})
 
 	return r
 }
