@@ -5,18 +5,22 @@ import (
 	"io"
 )
 
-type Blob []byte
-
 type BlobHandler struct {
 	Name             string
 	Compression      BlockCompression
 	CompressionLevel int
+	Validate         func(bs []byte) error
+	Dump             func(w io.Writer, bs []byte, opts *DumpOpts) error
 }
 
 func (h *BlobHandler) GoblinName() string { return h.Name }
 
 func (h *BlobHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
-	blob := b.(Blob)
+	blob := b.([]byte)
+
+	if h.Dump != nil {
+		return h.Dump(w, blob, opts)
+	}
 
 	switch opts.Verbose {
 	case DumpSummary:
@@ -32,6 +36,7 @@ func (h *BlobHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
 	default:
 		fmt.Fprintf(w, "(unknown verbosity)")
 	}
+
 	return nil
 }
 
@@ -40,10 +45,15 @@ func (h *BlobHandler) renderBytes(w io.Writer, bs []byte) {
 }
 
 func (h *BlobHandler) GoblinValidate(c any) error {
-	_, ok := c.(Blob)
+	bs, ok := c.([]byte)
 	if !ok {
 		return ErrInvalidDataType
 	}
+
+	if h.Validate != nil {
+		return h.Validate(bs)
+	}
+
 	return nil
 }
 
@@ -52,7 +62,7 @@ func (h *BlobHandler) GoblinCompression() (BlockCompression, int) {
 }
 
 func (h *BlobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
-	b, ok := c.(Blob)
+	b, ok := c.([]byte)
 	if !ok {
 		return 0, ErrInvalidDataType
 	}
@@ -64,7 +74,7 @@ func (h *BlobHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (Block
 }
 
 func (h *BlobHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
-	out := make(Blob, size)
+	out := make([]byte, size)
 	if _, err := io.ReadFull(r, out); err != nil {
 		return nil, err
 	}

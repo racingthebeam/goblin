@@ -159,6 +159,3 @@ Interned table, mapping integers to strings. Accessible by all blocks during enc
 
 A Goblin container must only contain one single `STRINGS` block.
 
-### `BLOB`
-
-Stores a chunk of bytes, no compression. Useful in simple circumstances where you don't need to overhead of defining your own block type.
