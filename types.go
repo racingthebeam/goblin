@@ -34,7 +34,6 @@ const (
 	BlockTypeStrings
 	BlockTypeRelations
 	BlockTypeMetadata
-	BlockTypeBlob
 )
 
 func (bt BlockType) IsPublic() bool  { return bt&BlockType(PublicBlockTypeBase) != 0 }
