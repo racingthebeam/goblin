@@ -61,10 +61,6 @@ func NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
 }
 
 func (e *Encoder) Encode(c *Container) error {
-	if !c.FileType.Valid() {
-		return ErrInvalidFileType
-	}
-
 	// 2 extra blocks - strings and relations
 	blockCount := len(c.blocks) + 2
 

@@ -35,7 +35,6 @@ const PublicTypeBase = 0x8000_0000
 // FileType
 type FileType uint32
 
-func (ft FileType) Valid() bool     { return ft != 0 }
 func (bt FileType) IsPublic() bool  { return bt&FileType(PublicTypeBase) == PublicTypeBase }
 func (bt FileType) IsPrivate() bool { return !bt.IsPublic() }
 
