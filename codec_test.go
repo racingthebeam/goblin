@@ -93,7 +93,7 @@ func TestEncodeDecode(t *testing.T) {
 		},
 	))
 
-	cIn := NewContainer()
+	cIn := NewContainer(WithFileType(123))
 
 	cIn.SetBlock(200, 0x0000_0001, "blockA", &A{
 		Name:         "Dillon",
@@ -120,6 +120,8 @@ func TestEncodeDecode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode failed: %s", err)
 	}
+
+	assert.Equal(t, FileType(123), cOut.FileType)
 
 	dA, ok := cOut.BlockData(200, 0x0000_0001)
 	assert.True(t, ok)

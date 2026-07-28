@@ -61,6 +61,10 @@ func NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
 }
 
 func (e *Encoder) Encode(c *Container) error {
+	if !c.FileType.Valid() {
+		return ErrInvalidFileType
+	}
+
 	// 2 extra blocks - strings and relations
 	blockCount := len(c.blocks) + 2
 
@@ -71,6 +75,7 @@ func (e *Encoder) Encode(c *Container) error {
 		return err
 	}
 
+	binary.Write(e.w, binary.BigEndian, uint32(c.FileType))
 	binary.Write(e.w, binary.BigEndian, uint32(blockCount))
 
 	indexOffset, err := e.w.Seek(0, io.SeekCurrent)
@@ -257,19 +262,21 @@ func (d *Decoder) DecodeHeader() (*DecodeContext, error) {
 	//
 	// Read header
 
-	n, err := d.r.Read(buf[0:12])
+	n, err := d.r.Read(buf[0:16])
 	if err != nil {
 		return nil, fmt.Errorf("failed to read container header (%s)", err)
-	} else if n != 12 {
-		return nil, fmt.Errorf("expected 12 bytes, got %d", n)
+	} else if n != 16 {
+		return nil, fmt.Errorf("expected 16 bytes, got %d", n)
 	} else if !bytes.Equal(header, buf[0:8]) {
 		return nil, errors.New("invalid header")
 	}
 
+	dc.FileType = FileType(binary.BigEndian.Uint32(buf[8:]))
+
 	//
 	// Load index
 
-	dc.Index = make([]IndexEntry, binary.BigEndian.Uint32(buf[8:]))
+	dc.Index = make([]IndexEntry, binary.BigEndian.Uint32(buf[12:]))
 
 	for i := range len(dc.Index) {
 		if err := d.readIndexEntry(&dc.Index[i], buf); err != nil {
@@ -330,6 +337,7 @@ func (d *Decoder) DecodeHeader() (*DecodeContext, error) {
 
 func (d *Decoder) DecodeBlocks(dc *DecodeContext) (*Container, error) {
 	out := NewContainer()
+	out.FileType = dc.FileType
 	out.relations = dc.Relations
 
 	for i := range dc.Index {
@@ -403,6 +411,7 @@ func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block
 // DecodeContext
 
 type DecodeContext struct {
+	FileType  FileType
 	Index     []IndexEntry
 	Strings   *Strings
 	Relations Relations

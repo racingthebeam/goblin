@@ -7,16 +7,30 @@ import (
 	"slices"
 )
 
+type ContainerOpt func(c *Container)
+
+func WithFileType(fileType FileType) ContainerOpt {
+	return func(c *Container) {
+		c.FileType = fileType
+	}
+}
+
 type Container struct {
+	FileType FileType
+
 	blocks    map[BlockID]*Block
 	relations Relations
 }
 
-func NewContainer() *Container {
-	return &Container{
+func NewContainer(opts ...ContainerOpt) *Container {
+	c := &Container{
 		blocks:    map[BlockID]*Block{},
 		relations: Relations{},
 	}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 // BlockIDs returns a sorted list of all block IDs in this container.

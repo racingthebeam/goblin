@@ -6,9 +6,17 @@ import (
 )
 
 var (
+	ErrInvalidFileType = errors.New("invalid file type")
 	ErrInvalidDataType = errors.New("invalid data type")
 )
 
+// BlockID uniquely identifies a block within a Goblin container.
+//
+// Block IDs *may* carry semantic meaning in the context of the enclosing filetype;
+// this is implementation dependent. Additionally, block IDs starting from 0xFFFF0000
+// are reserved for internal use.
+//
+// Block ID 0 is invalid and must not be used.
 type BlockID uint32
 
 func (b BlockID) Valid() bool { return b != 0 }
@@ -18,25 +26,32 @@ const reservedBlockIDBase = 0xFFFF_0000
 func (i BlockID) IsReserved() bool { return i >= reservedBlockIDBase }
 
 const (
-	BlockIDRelations = BlockID(reservedBlockIDBase + iota)
-	BlockIDStrings
+	BlockIDRelations BlockID = reservedBlockIDBase + 0
+	BlockIDStrings   BlockID = reservedBlockIDBase + 1
 )
 
+const PublicTypeBase = 0x8000_0000
+
+// FileType
+type FileType uint32
+
+func (ft FileType) Valid() bool     { return ft != 0 }
+func (bt FileType) IsPublic() bool  { return bt&FileType(PublicTypeBase) == PublicTypeBase }
+func (bt FileType) IsPrivate() bool { return !bt.IsPublic() }
+
+// BlockType
 type BlockType uint32
-
-func (bt BlockType) Valid() bool { return bt != 0 }
-
-const PublicBlockTypeBase = 0x8000_0000
 
 // Built-in block types
 const (
-	BlockTypeFileInfo = BlockType(PublicBlockTypeBase + iota)
-	BlockTypeStrings
-	BlockTypeRelations
-	BlockTypeMetadata
+	BlockTypeFileInfo  BlockType = PublicTypeBase + 0
+	BlockTypeStrings   BlockType = PublicTypeBase + 1
+	BlockTypeRelations BlockType = PublicTypeBase + 2
+	BlockTypeMetadata  BlockType = PublicTypeBase + 3
 )
 
-func (bt BlockType) IsPublic() bool  { return bt&BlockType(PublicBlockTypeBase) != 0 }
+func (bt BlockType) Valid() bool     { return bt != 0 }
+func (bt BlockType) IsPublic() bool  { return bt&BlockType(PublicTypeBase) == PublicTypeBase }
 func (bt BlockType) IsPrivate() bool { return !bt.IsPublic() }
 
 type BlockVersion uint16
