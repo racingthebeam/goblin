@@ -1,26 +1,40 @@
 # goblin
 
-Goblin is a generic block-based container format for binary data with support for string interning, block relationship modelling and per-block compression. It was extracted from the [BEAM256 Low-Level Fantasy Console project](https://github.com/racingthebeam/beam256).
+This repository contains a description of the Goblin file format along with a reference implementation written in Go.
+
+Goblin is a generic block-based container format for binary data with support for string interning, block relationship modelling and configurable compression settings. It was extracted from the [BEAM256 Low-Level Fantasy Console project](https://github.com/racingthebeam/beam256).
+
+Consider using Goblin when you need to store (potentially inter-related) chunks of structured binary data and don't want to think about high-level encoding concerns - blocks are simply Go values that know how to serialize themselves. Additionally, Goblin's built-in string interning simplifies many scenarios, changing otherwise variable-length data to fixed-length values.
+
+**Non-Goals**
+
+  - While Goblin describes a common encoding format for binary data, it is not intended to be a universal self-describing interchange format. That is, in the absence of additional context or cooperation, there is no implicit assumption that program 'A' should be able to meaningfully interpret a Goblin file produced by an unrelated program 'B' (with ith proper coordination this is of course possible, and Goblin supports both public and private identifiers to facilitate this).
+  - Goblin is not designed for streaming data, and is intended mainly for payloads that fit comfortably in memory
+
+Why the name "Goblin"? This project was extracted from a custom toolchain, and ELF and DWARF were both taken :).
 
 ## Table of Contents
 
   - Concepts
+  - Example Usage
   - Built-in Block Types
   - (Go) CLI Tool Usage
 
 ## Concepts
 
-  - Container -
+A **Container** is the top-level Goblin entity, containing a list of **Blocks**, each having its own **Block ID** and **Block Type**. Containers also have an optional top-level **File Type** that may be used by implementers to denote the expected structure of the full Container. Containers may exist either on-disk (for storage), or in-memory (for manipulation using this library).
+
+  - Container - 
   - Block -
   - Block ID - a 32 bit unsigned integer, greater than zero, that uniquely identifies each block in a container. Block IDs may be manually allocated, or auto-generated when a block is attached. Whether or not block IDs are meaningful is dependent on the project - simple projects may stick to a set of well-known IDs, whereas larger projects with dynamic data may need to be more generic. A handful of block IDs (>= `0xFFFF0000`) are reserved for internal use (e.g. string and relation tables).
-  - Block type - again, a 32 bit unsigned integer, greater than zero, that specifies the type of each block. The block type is directly used to map on-disk blocks to their corresponding `BlockTypeHandler` instances, via a `Registry`. The block type's MSB specifies whether the block type is **public** (MSB set) or **private** (MSB unset). Private block types are intended for internal use by users, without expectation that they will not clash with other users' private block types. For use cases requiring public interop, see [Public Block Types](PUBLIC_BLOCK_TYPES.md))
+  - Block type - again, a 32 bit unsigned integer, greater than zero, that specifies the type of each block. The block type is directly used to map on-disk blocks to their corresponding `BlockTypeHandler` instances, via a `Registry`. The block type's MSB specifies whether the block type is **public** (MSB set) or **private** (MSB unset). Private block types are intended for internal use by users, without expectation that they will not clash with other users' private block types. For use cases requiring public interop, see [Public Types](PUBLIC_TYPES.md))
 
 ## Basic Usage
 
 ```golang
 const (
     // Each block type has its own ID
-    // For private/internal use, you are free to allocate your own
+    // For private/internal use, you are free to allocate your own values < 0x80000000
     blockTypeA = 1
     blockTypeB = 2
 )
@@ -75,9 +89,9 @@ Support for custom block types is implemented by creating a handler conforming t
 type BlockTypeHandler interface {
 	GoblinName() string
 	GoblinDump(w io.Writer, b any, opts *DumpOpts) error
-	GoblinValidate(c any) error
-	GoblinCompression() BlockCompression
-	GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error)
+	GoblinValidate(b any) error
+	GoblinCompression() (BlockCompression, int)
+	GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)
 	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
 }
 ```
@@ -94,7 +108,7 @@ Dump the block contents `b` to output `w`, for diagnostics/inspection purposes. 
 
 #### `GolinValidate(b any) error`
 
-Check block data `b` for validity.
+Check block data `b` for validity prior to writing.
 
 #### `GoblinCompression() (BlockCompression, int)`
 
@@ -151,11 +165,11 @@ When using custom regstries, use `registry.NewEncoder()`/`registry.NewDecoder()`
 
 Models inter-block relationships. Each relationship is modelled as a tuple of (from block ID, to block ID, type, name), where type is one of `Contains` or `References` (the former allowing for the representation of hierarchy), and name is an arbitrary string that describes the relationship; there is no requirement that this be unique.
 
-A Goblin container must only contain one single `RELATIONS` block.
+A Goblin container must only contain one single `RELATIONS` block - typically managed automatically by `Container`.
 
 ### `STRINGS`
 
 Interned table, mapping integers to strings. Accessible by all blocks during encode and decode phases. In many circumstances using `STRINGS` allows blocks to encode their data using fixed-length records while still permitting arbitrary length strings as descriptors.
 
-A Goblin container must only contain one single `STRINGS` block.
+A Goblin container must only contain one single `STRINGS` block - typically managed automatically by the encode/decode process.
 
