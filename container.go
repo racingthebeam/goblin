@@ -108,11 +108,11 @@ func (c *Container) FirstBlockOfType(typ BlockType) Block {
 
 // Returns a list of the given block's children; that is, all related blocks
 // whose relation type is Contains.
-func (c *Container) Children(id BlockID) []Block {
+func (c *Container) Children(parentBlockID BlockID) []Block {
 	out := make([]Block, 0)
 	for i := range c.relations {
 		r := &c.relations[i]
-		if r.FromBlockID == id && r.Kind == Contains {
+		if r.FromBlockID == parentBlockID && r.Kind == Contains {
 			b := c.blocks[r.ToBlockID]
 			if b != nil {
 				out = append(out, *c.blocks[r.ToBlockID])
@@ -123,10 +123,10 @@ func (c *Container) Children(id BlockID) []Block {
 }
 
 // Returns the first encountered child block with a given type.
-func (c *Container) FirstChildOfType(id BlockID, t BlockType) Block {
+func (c *Container) FirstChildOfType(parentBlockID BlockID, t BlockType) Block {
 	for i := range c.relations {
 		r := &c.relations[i]
-		if r.FromBlockID == id && r.Kind == Contains {
+		if r.FromBlockID == parentBlockID && r.Kind == Contains {
 			b := c.blocks[r.ToBlockID]
 			if b != nil && b.Type == t {
 				return *b
@@ -137,11 +137,11 @@ func (c *Container) FirstChildOfType(id BlockID, t BlockType) Block {
 }
 
 // Returns all child blocks with a given type.
-func (c *Container) ChildrenOfType(id BlockID, t BlockType) []Block {
+func (c *Container) ChildrenOfType(parentBlockID BlockID, t BlockType) []Block {
 	out := make([]Block, 0)
 	for i := range c.relations {
 		r := &c.relations[i]
-		if r.FromBlockID == id && r.Kind == Contains {
+		if r.FromBlockID == parentBlockID && r.Kind == Contains {
 			b := c.blocks[r.ToBlockID]
 			if b != nil && b.Type == t {
 				out = append(out, *b)
