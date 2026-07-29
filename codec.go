@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"reflect"
 	"slices"
 )
 
@@ -221,6 +222,39 @@ func NewEncodeContext() *EncodeContext {
 	}
 }
 
+// WriteRecord() encodes one or more values to w via binary.Write(), using big-endian
+// byte order. Additionally, string values will be interned to the string table and a
+// StringRef (uint32) written in their place.
+//
+// NOTE: while binary.Write() technically supports slices and structs, they must be
+// used with caution. For slices, the length must first be written as a prefix, followed
+// by values. Reading them back becomes a two-step process; first, read the length and
+// allocate the slice, then pass the slice to WriteRecord() (or directly to binary.Read())
+//
+// Care must also be taken with struct values to ensure stability since field changes
+// between versions may lead to unexpected results.
+func (dc *EncodeContext) WriteRecord(w io.Writer, vals ...any) error {
+	for _, v := range vals {
+		// strings are indirectly encoded via the string table
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.String {
+			v, _ = dc.Strings.Add(rv.String())
+		}
+		if err := binary.Write(w, binary.BigEndian, v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (dc *EncodeContext) WriteInternedString(w io.Writer, str string) (StringRef, error) {
+	stringID, _ := dc.Strings.Add(str)
+	if err := binary.Write(w, binary.BigEndian, stringID); err != nil {
+		return 0, err
+	}
+	return StringRef(stringID), nil
+}
+
 //
 // Decoder
 
@@ -415,4 +449,59 @@ type DecodeContext struct {
 
 func newDecodeContext() *DecodeContext {
 	return &DecodeContext{}
+}
+
+// ReadRecord() decodes one or more values from r via binary.Read(), using big-endian
+// byte order. Additionally, string pointers will be read as StringRefs (uint32) and
+// then decoded via the string table.
+//
+// Returns io.EOF only if the the underlying EOF occurred when attempting to read the
+// first byte. Otherwise, ui.ErrUnexpectedEOF is returned; this ensures that it is
+// always possible to differentiate a partial record from a true EOF.
+//
+// See the documentation for WriteRecord() for notes on slices/structs.
+func (dc *DecodeContext) ReadRecord(r io.Reader, vals ...any) error {
+	for i, v := range vals {
+		str := false
+		ref := StringRef(0)
+		tgt := v
+
+		// if the value is a string pointer, change target to StringRef so
+		// we can do an indirect translation via the string table
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Pointer && rv.Elem().Kind() == reflect.String {
+			str = true
+			tgt = &ref
+		}
+
+		err := binary.Read(r, binary.BigEndian, tgt)
+		if i == 0 && errors.Is(err, io.EOF) {
+			return io.EOF
+		} else if errors.Is(err, io.EOF) {
+			return io.ErrUnexpectedEOF
+		} else if err != nil {
+			return err
+		}
+
+		if str {
+			str, found := dc.Strings.Lookup(ref)
+			if !found {
+				return fmt.Errorf("string %d not found in string table", ref)
+			}
+			rv.Elem().SetString(str)
+		}
+	}
+	return nil
+}
+
+func (dc *DecodeContext) ReadInternedString(r io.Reader) (string, error) {
+	var stringID uint32
+	if err := binary.Read(r, binary.BigEndian, &stringID); err != nil {
+		return "", err
+	}
+	str, ok := dc.Strings.Lookup(StringRef(stringID))
+	if !ok {
+		return "", fmt.Errorf("string %d not found in string table", stringID)
+	}
+	return str, nil
 }

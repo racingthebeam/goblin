@@ -1,7 +1,6 @@
 package goblin
 
 import (
-	"encoding/binary"
 	"io"
 	"os"
 	"testing"
@@ -48,31 +47,18 @@ func TestEncodeDecode(t *testing.T) {
 	r.RegisterBlockType(0x0000_0001, testHandler(
 		"testA",
 		func(ec *EncodeContext, w io.Writer, a any) (BlockVersion, error) {
-			name, _ := ec.Strings.Add(a.(*A).Name)
-			fp, _ := ec.Strings.Add(a.(*A).FavouritePet)
-			binary.Write(w, binary.BigEndian, uint32(name))
-			binary.Write(w, binary.BigEndian, uint32(fp))
-			binary.Write(w, binary.BigEndian, uint32(a.(*A).Age))
+			instance := a.(*A)
+			ec.WriteRecord(w, instance.Name, instance.FavouritePet, uint32(instance.Age))
 			return 1, nil
 		},
 		func(dc *DecodeContext, r io.Reader, bv BlockVersion, i int64) (any, error) {
-			var (
-				nameRef uint32
-				fpRef   uint32
-				age     uint32
-			)
-			binary.Read(r, binary.BigEndian, &nameRef)
-			binary.Read(r, binary.BigEndian, &fpRef)
-			binary.Read(r, binary.BigEndian, &age)
-
-			name, _ := dc.Strings.Lookup(StringRef(nameRef))
-			fp, _ := dc.Strings.Lookup(StringRef(fpRef))
-
-			return &A{
-				Name:         name,
-				FavouritePet: fp,
-				Age:          int(age),
-			}, nil
+			out := A{}
+			var age uint32
+			if err := dc.ReadRecord(r, &out.Name, &out.FavouritePet, &age); err != nil {
+				return nil, err
+			}
+			out.Age = int(age)
+			return &out, nil
 		},
 	))
 
