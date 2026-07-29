@@ -85,6 +85,17 @@ func (c *Container) Relations() Relations {
 	return c.relations
 }
 
+// Returns all blocks with the given type.
+func (c *Container) BlocksOfType(typ BlockType) []Block {
+	out := make([]Block, 0)
+	for _, b := range c.blocks {
+		if b.Type == typ {
+			out = append(out, *b)
+		}
+	}
+	return out
+}
+
 // Returns the first block with the given type. Check existence with block.Valid().
 func (c *Container) FirstBlockOfType(typ BlockType) Block {
 	for _, b := range c.blocks {
