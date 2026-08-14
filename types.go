@@ -111,10 +111,13 @@ type BlockTypeHandler interface {
 	// GoblinEncode().
 	GoblinCompression() (BlockCompression, int)
 
+	// Returns the block's metadata; called before GoblinEncode()
+	GoblinMetadata(b any) (map[string]any, error)
+
 	// Encode the block to the target writer, returning the version number.
 	GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)
 
-	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
+	GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error)
 }
 
 const (

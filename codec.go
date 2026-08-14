@@ -414,7 +414,7 @@ func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block
 		return nil, fmt.Errorf("failed to wrap reader for block ID %d (%s)", ent.ID, err)
 	}
 
-	data, err := hnd.GoblinDecode(dc, r, ent.Version, int64(ent.DataSize))
+	data, err := hnd.GoblinDecode(dc, r, ent.Version, int64(ent.DataSize), nil)
 	if err != nil {
 		return nil, fmt.Errorf("block ID %d decode failed (%s)", ent.ID, err)
 	}

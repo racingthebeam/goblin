@@ -10,9 +10,10 @@ type SimpleHandler struct {
 	Dump        func(w io.Writer, b any, opts *DumpOpts) error
 	Validate    func(b any) error
 	Compression func() (BlockCompression, int)
+	Metadata    func(b any) (map[string]any, error)
 	Encode      func(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error)
-	Decode      func(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
-	Decoders    map[BlockVersion]func(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error)
+	Decode      func(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error)
+	Decoders    map[BlockVersion]func(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error)
 }
 
 func (h *SimpleHandler) GoblinName() string { return h.Name }
@@ -42,7 +43,7 @@ func (h *SimpleHandler) GoblinEncode(dst *EncodeContext, w io.Writer, b any) (Bl
 	return h.Encode(dst, w, b)
 }
 
-func (h *SimpleHandler) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error) {
+func (h *SimpleHandler) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error) {
 	dec := h.Decode
 	if h.Decoders != nil && h.Decoders[ver] != nil {
 		dec = h.Decoders[ver]
@@ -50,5 +51,5 @@ func (h *SimpleHandler) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockV
 	if dec == nil {
 		return nil, fmt.Errorf("no suitable decoder found for version %d", ver)
 	}
-	return dec(src, r, ver, size)
+	return dec(src, r, ver, size, metadata)
 }

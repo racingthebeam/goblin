@@ -26,12 +26,13 @@ func (h *th) GoblinName() string                                  { return h.nam
 func (h *th) GoblinDump(w io.Writer, b any, opts *DumpOpts) error { return nil }
 func (h *th) GoblinValidate(c any) error                          { return nil }
 func (h *th) GoblinCompression() (BlockCompression, int)          { return NoCompression, 0 }
+func (h *th) GoblinMetadata(b any) (map[string]any, error)        { return nil, nil }
 
 func (h *th) GoblinEncode(dst *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	return h.enc(dst, w, c)
 }
 
-func (h *th) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64) (any, error) {
+func (h *th) GoblinDecode(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error) {
 	return h.dec(src, r, ver, size)
 }
 

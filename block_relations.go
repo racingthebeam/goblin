@@ -68,6 +68,10 @@ func (h *relationsHandler) GoblinCompression() (BlockCompression, int) {
 	return NoCompression, 0
 }
 
+func (h *relationsHandler) GoblinMetadata(b any) (map[string]any, error) {
+	return nil, nil
+}
+
 func (h *relationsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	rs, ok := c.(Relations)
 	if !ok {
@@ -88,7 +92,7 @@ func (h *relationsHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (
 	return 1, nil
 }
 
-func (h *relationsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
+func (h *relationsHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64, metadata map[string]any) (any, error) {
 	if size%relationRecordLength != 0 {
 		return nil, fmt.Errorf("relation block size must be multiple of %d", relationRecordLength)
 	}

@@ -20,10 +20,14 @@ func (h *fileInfoHandler) GoblinCompression() (BlockCompression, int) {
 	return NoCompression, 0
 }
 
+func (h *fileInfoHandler) GoblinMetadata(b any) (map[string]any, error) {
+	return nil, nil
+}
+
 func (h *fileInfoHandler) GoblinEncode(ec *EncodeContext, w io.Writer, c any) (BlockVersion, error) {
 	return 1, nil
 }
 
-func (h *fileInfoHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64) (any, error) {
+func (h *fileInfoHandler) GoblinDecode(dc *DecodeContext, r io.Reader, version BlockVersion, size int64, metadata map[string]any) (any, error) {
 	return &FileInfo{}, nil
 }

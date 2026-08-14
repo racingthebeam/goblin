@@ -40,7 +40,7 @@ func TestStringsCodec(t *testing.T) {
 	assert.Equal(t, BlockVersion(1), n)
 
 	dc := newDecodeContext()
-	reloaded, err := codec.GoblinDecode(dc, &buf, 1, 13)
+	reloaded, err := codec.GoblinDecode(dc, &buf, 1, 13, nil)
 	assert.NoError(t, err)
 
 	str, ok := reloaded.(*Strings).Lookup(1)
@@ -78,7 +78,7 @@ func TestRelationsCodec(t *testing.T) {
 	dc := newDecodeContext()
 	dc.Strings = ec.Strings
 
-	reloaded, err := hnd.GoblinDecode(dc, &buf, 1, 48)
+	reloaded, err := hnd.GoblinDecode(dc, &buf, 1, 48, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, rels, reloaded.(Relations))
 }
