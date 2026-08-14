@@ -3,9 +3,15 @@ package goblin
 import (
 	"compress/gzip"
 	"compress/zlib"
+	"encoding/binary"
 	"fmt"
 	"io"
 )
+
+var ByteOrder = binary.BigEndian
+
+func read(r io.Reader, val any) error  { return binary.Read(r, ByteOrder, val) }
+func write(w io.Writer, val any) error { return binary.Write(w, ByteOrder, val) }
 
 func anyErr(errors ...error) error {
 	for _, e := range errors {
