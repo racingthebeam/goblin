@@ -173,3 +173,10 @@ Interned table, mapping integers to strings. Accessible by all blocks during enc
 
 A Goblin container must only contain one single `STRINGS` block - typically managed automatically by the encode/decode process.
 
+## Limitations
+
+### Metadata
+
+There is a hard limit of 65,535 key/value pairs for each block's metadata. This is deemed acceptable since metadata is precisely that - metadata; it is not intended as the primary data storage mechanism, which supports per-block payloads of up to 4GiB.
+
+Block metadata currently only supports scalar values: ints, floats, booleans, and strings - there is no support for nested dictionaries or arrays. These may be added in the future.
