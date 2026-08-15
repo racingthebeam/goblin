@@ -16,6 +16,8 @@ type SimpleHandler struct {
 	Decoders    map[BlockVersion]func(src *DecodeContext, r io.Reader, ver BlockVersion, size int64, metadata map[string]any) (any, error)
 }
 
+var _ BlockTypeHandler = &SimpleHandler{}
+
 func (h *SimpleHandler) GoblinName() string { return h.Name }
 
 func (h *SimpleHandler) GoblinDump(w io.Writer, b any, opts *DumpOpts) error {
@@ -37,6 +39,13 @@ func (h *SimpleHandler) GoblinCompression() (BlockCompression, int) {
 		return h.Compression()
 	}
 	return NoCompression, 0
+}
+
+func (h *SimpleHandler) GoblinMetadata(b any) (map[string]any, error) {
+	if h.Metadata == nil {
+		return nil, nil
+	}
+	return h.Metadata(b)
 }
 
 func (h *SimpleHandler) GoblinEncode(dst *EncodeContext, w io.Writer, b any) (BlockVersion, error) {
