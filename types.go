@@ -87,6 +87,8 @@ type IndexEntry struct {
 	ID             BlockID          // 4
 	Type           BlockType        // 4
 	Name           StringRef        // 4
+	MetadataOffset uint32           // 4
+	MetadataSize   uint32           // 4
 	Version        BlockVersion     // 2
 	Compression    BlockCompression // 2
 	Offset         int64            // 8

@@ -27,7 +27,7 @@ var (
 )
 
 const (
-	indexEntrySize = 32
+	indexEntrySize = 40
 )
 
 type Option func(any)
@@ -48,9 +48,8 @@ func WithRegistry(r *Registry) Option {
 type Encoder struct {
 	w io.WriteSeeker
 
-	index []IndexEntry
-	c     *EncodeContext
-	reg   *Registry
+	c   *EncodeContext
+	reg *Registry
 }
 
 func NewEncoder(w io.WriteSeeker, opts ...Option) *Encoder {
@@ -65,7 +64,6 @@ func (e *Encoder) Encode(c *Container) error {
 	// 2 extra blocks - strings and relations
 	blockCount := len(c.blocks) + 2
 
-	e.index = make([]IndexEntry, 0, blockCount)
 	e.c = NewEncodeContext()
 
 	if _, err := e.w.Write(header); err != nil {
@@ -87,56 +85,122 @@ func (e *Encoder) Encode(c *Container) error {
 		}
 	}
 
+	index := map[BlockID]*IndexEntry{}
 	for _, blockID := range slices.Sorted(maps.Keys(c.blocks)) {
 		block := c.blocks[blockID]
-		if ent, err := e.writeBlock(block); err != nil {
+
+		ent := new(IndexEntry)
+		ent.ID = block.ID
+		ent.Type = block.Type
+		ent.Name = e.c.Strings.Put(block.Name)
+
+		index[blockID] = ent
+
+		if err := e.writeBlockMetadata(ent, block); err != nil {
 			return err
-		} else {
-			e.index = append(e.index, ent)
 		}
 	}
 
-	if ent, err := e.writeBlock(&Block{
+	for _, blockID := range slices.Sorted(maps.Keys(c.blocks)) {
+		block := c.blocks[blockID]
+		if err := e.writeBlock(index[blockID], block); err != nil {
+			return err
+		}
+	}
+
+	var ie *IndexEntry
+
+	ie = &IndexEntry{
+		ID:             BlockIDRelations,
+		Type:           BlockTypeRelations,
+		Name:           0,
+		MetadataOffset: 0,
+		MetadataSize:   0,
+	}
+
+	index[BlockIDRelations] = ie
+	if err := e.writeBlock(ie, &Block{
 		ID:   BlockIDRelations,
 		Type: BlockTypeRelations,
 		Data: c.relations,
 	}); err != nil {
 		return fmt.Errorf("failed to write relations block (%s)", err)
-	} else {
-		e.index = append(e.index, ent)
 	}
 
-	if ent, err := e.writeBlock(&Block{
+	ie = &IndexEntry{
+		ID:             BlockIDStrings,
+		Type:           BlockTypeStrings,
+		Name:           0,
+		MetadataOffset: 0,
+		MetadataSize:   0,
+	}
+
+	index[BlockIDStrings] = ie
+	if err := e.writeBlock(ie, &Block{
 		ID:   BlockIDStrings,
 		Type: BlockTypeStrings,
 		Data: e.c.Strings,
 	}); err != nil {
 		return fmt.Errorf("failed to write strings block (%s)", err)
-	} else {
-		e.index = append(e.index, ent)
 	}
 
-	if err := e.writeIndex(indexOffset); err != nil {
+	if err := e.writeIndex(indexOffset, index); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
+func (e *Encoder) writeBlockMetadata(ent *IndexEntry, b *Block) error {
 	hnd, found := e.reg.LookupBlockType(b.Type)
 	if !found {
-		return IndexEntry{}, fmt.Errorf("no block type handler found for block type %d", b.Type)
+		return fmt.Errorf("no block type handler found for block type %d", b.Type)
 	}
 
-	ent := IndexEntry{ID: b.ID, Type: b.Type}
+	md, err := hnd.GoblinMetadata(b.Data)
+	if err != nil {
+		return err
+	}
 
-	name, _ := e.c.Strings.Add(b.Name)
-	ent.Name = name
+	if len(md) == 0 {
+		ent.MetadataOffset = 0
+		ent.MetadataSize = 0
+		return nil
+	}
+
+	startOffset, err := e.w.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	if err := metadataEncode(e.w, e.c.Strings, md); err != nil {
+		return err
+	}
+
+	endOffset, err := e.w.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	ent.MetadataOffset = uint32(startOffset)
+	ent.MetadataSize = uint32(endOffset - startOffset)
+
+	if err := e.align4(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e *Encoder) writeBlock(ent *IndexEntry, b *Block) error {
+	hnd, found := e.reg.LookupBlockType(b.Type)
+	if !found {
+		return fmt.Errorf("no block type handler found for block type %d", b.Type)
+	}
 
 	offset, err := e.w.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return ent, err
+		return err
 	}
 
 	ent.Offset = offset
@@ -144,15 +208,15 @@ func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
 	comp, level := hnd.GoblinCompression()
 	w, err := wrapWriter(e.w, comp, level)
 	if err != nil {
-		return IndexEntry{}, err
+		return err
 	}
 
 	ent.Compression = comp
 
 	if version, err := hnd.GoblinEncode(e.c, w, b.Data); err != nil {
-		return IndexEntry{}, err
+		return err
 	} else if err := w.Close(); err != nil {
-		return IndexEntry{}, err
+		return err
 	} else {
 		ent.Version = version
 	}
@@ -161,33 +225,36 @@ func (e *Encoder) writeBlock(b *Block) (IndexEntry, error) {
 
 	offset, err = e.w.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return IndexEntry{}, err
+		return err
 	}
 
 	ent.CompressedSize = uint32(offset - ent.Offset)
 
 	if err := e.align4(); err != nil {
-		return IndexEntry{}, err
+		return err
 	}
 
-	return ent, nil
+	return nil
 }
 
-func (e *Encoder) writeIndex(offset int64) error {
+func (e *Encoder) writeIndex(offset int64, index map[BlockID]*IndexEntry) error {
 	if _, err := e.w.Seek(offset, io.SeekStart); err != nil {
 		return err
 	}
 
-	for i, ie := range e.index {
-		err1 := binary.Write(e.w, binary.BigEndian, ie.ID)
-		err2 := binary.Write(e.w, binary.BigEndian, ie.Type)
-		err3 := binary.Write(e.w, binary.BigEndian, ie.Name)
-		err4 := binary.Write(e.w, binary.BigEndian, ie.Version)
-		err5 := binary.Write(e.w, binary.BigEndian, ie.Compression)
-		err6 := binary.Write(e.w, binary.BigEndian, ie.Offset)
-		err7 := binary.Write(e.w, binary.BigEndian, ie.DataSize)
-		err8 := binary.Write(e.w, binary.BigEndian, ie.CompressedSize)
-		if err := anyErr(err1, err2, err3, err4, err5, err6, err7, err8); err != nil {
+	for i, blockID := range slices.Sorted(maps.Keys(index)) {
+		ie := index[blockID]
+		errA := write(e.w, ie.ID)
+		errB := write(e.w, ie.Type)
+		errC := write(e.w, ie.Name)
+		errD := write(e.w, ie.MetadataOffset)
+		errE := write(e.w, ie.MetadataSize)
+		errF := write(e.w, ie.Version)
+		errG := write(e.w, ie.Compression)
+		errH := write(e.w, ie.Offset)
+		errI := write(e.w, ie.DataSize)
+		errJ := write(e.w, ie.CompressedSize)
+		if err := anyErr(errA, errB, errC, errF, errD, errE, errG, errH, errI, errJ); err != nil {
 			return fmt.Errorf("failed to write index entry %d (%s)", i, err)
 		}
 	}
@@ -390,11 +457,13 @@ func (d *Decoder) readIndexEntry(dst *IndexEntry, buf []byte) error {
 	dst.ID = BlockID(binary.BigEndian.Uint32(buf[0:4]))
 	dst.Type = BlockType(binary.BigEndian.Uint32(buf[4:8]))
 	dst.Name = StringRef(binary.BigEndian.Uint32(buf[8:12]))
-	dst.Version = BlockVersion(binary.BigEndian.Uint16(buf[12:14]))
-	dst.Compression = BlockCompression(binary.BigEndian.Uint16(buf[14:16]))
-	dst.Offset = int64(binary.BigEndian.Uint64(buf[16:24]))
-	dst.DataSize = binary.BigEndian.Uint32(buf[24:28])
-	dst.CompressedSize = binary.BigEndian.Uint32(buf[28:32])
+	dst.MetadataOffset = uint32(binary.BigEndian.Uint32(buf[12:16]))
+	dst.MetadataSize = uint32(binary.BigEndian.Uint32(buf[16:20]))
+	dst.Version = BlockVersion(binary.BigEndian.Uint16(buf[20:22]))
+	dst.Compression = BlockCompression(binary.BigEndian.Uint16(buf[22:24]))
+	dst.Offset = int64(binary.BigEndian.Uint64(buf[24:32]))
+	dst.DataSize = binary.BigEndian.Uint32(buf[32:36])
+	dst.CompressedSize = binary.BigEndian.Uint32(buf[36:40])
 	return nil
 }
 
@@ -402,6 +471,20 @@ func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block
 	hnd, found := d.reg.LookupBlockType(ent.Type)
 	if !found {
 		return nil, fmt.Errorf("block ID %d has unknown type %d", ent.ID, ent.Type)
+	}
+
+	var metadata map[string]any
+	if ent.MetadataOffset == 0 {
+		metadata = map[string]any{}
+	} else {
+		_, err := d.r.Seek(int64(ent.MetadataOffset), io.SeekStart)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err = metadataDecode(&io.LimitedReader{R: d.r, N: int64(ent.MetadataSize)}, dc.Strings)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	_, err := d.r.Seek(ent.Offset, io.SeekStart)
@@ -414,7 +497,7 @@ func (d *Decoder) readBlockFromEntry(dc *DecodeContext, ent *IndexEntry) (*Block
 		return nil, fmt.Errorf("failed to wrap reader for block ID %d (%s)", ent.ID, err)
 	}
 
-	data, err := hnd.GoblinDecode(dc, r, ent.Version, int64(ent.DataSize), nil)
+	data, err := hnd.GoblinDecode(dc, r, ent.Version, int64(ent.DataSize), metadata)
 	if err != nil {
 		return nil, fmt.Errorf("block ID %d decode failed (%s)", ent.ID, err)
 	}
