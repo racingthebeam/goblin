@@ -34,6 +34,11 @@ func (s *Strings) Has(str string) bool {
 	return ok
 }
 
+func (s *Strings) Put(str string) StringRef {
+	out, _ := s.Add(str)
+	return out
+}
+
 func (s *Strings) Add(str string) (StringRef, bool) {
 	if len(str) == 0 {
 		return 0, true
